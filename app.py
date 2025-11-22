@@ -75,10 +75,18 @@ class DataStore:
     def get_user(self, username):
         return self._load().get("users", {}).get(username)
 
-    def update_user(self, username, updates):  # ← SIN ERROR DE SINTAXIS
+    def update_user(self, username, updates):
         data = self._load()
         if username in data["users"]:
             data["users"][username].update(updates)
+            self._save(data)
+            return True
+        return False
+
+    def delete_user(self, username):
+        data = self._load()
+        if username in data["users"] and data["users"][username]["role"] == "doctor":
+            del data["users"][username]
             self._save(data)
             return True
         return False
@@ -110,7 +118,7 @@ def load_model():
     try:
         return joblib.load("modelo_erc.joblib")
     except:
-        st.warning("Modelo no encontrado → Modo simulación")
+        st.sidebar.warning("Modelo no encontrado → Modo simulación")
         return None
 
 model = load_model()
@@ -133,12 +141,14 @@ if not st.session_state.logged_in:
                 st.session_state.username = user
                 st.session_state.role = u["role"]
                 st.session_state.user_id = u["id"]
+                st.success("¡Bienvenido!")
+                time.sleep(0.5)
                 st.rerun()
             else:
                 st.error("Credenciales incorrectas o usuario inactivo")
     st.stop()
 
-# Logout
+# Logout + Info
 col1, col2 = st.columns([4,1])
 with col1:
     st.success(f"Usuario: **{st.session_state.username.upper()}** • Rol: **{st.session_state.role.upper()}**")
@@ -154,9 +164,9 @@ st.markdown("---")
 # FUNCIONES CLAVE
 # =============================================
 def get_risk_level(risk):
-    if risk > 70: return "MUY ALTO", "#CE1126", "Referir URGENTE"
-    elif risk > 40: return "ALTO", "#FFC400", "Control estricto"
-    else: return "MODERADO", "#4CAF50", "Control habitual"
+    if risk > 70: return "MUY ALTO", "#CE1126", "Referir URGENTE a nefrólogo"
+    elif risk > 40: return "ALTO", "#FFC400", "Control estricto cada 3 meses"
+    else: return "MODERADO", "#4CAF50", "Control anual o bianual"
 
 def predict_risk(row):
     features = np.array([[row["edad"], row["imc"], row["presion_sistolica"], row["glucosa_ayunas"], row["creatinina"]]])
@@ -164,14 +174,13 @@ def predict_risk(row):
         prob = model.predict_proba(features)[0][1]
         return round(prob * 100, 1)
     else:
-        # Simulación simple
         base = 10 + (row["creatinina"] - 1) * 35 + max(0, row["glucosa_ayunas"] - 126) * 0.3
         return max(1, min(99, base + np.random.uniform(-10, 15)))
 
 # =============================================
-# PESTAÑAS
+# PESTAÑAS PRINCIPALES
 # =============================================
-tab1, tab2, tab3 = st.tabs(["Predicción Individual", "Carga Masiva", "Historial"])
+tab1, tab2, tab3 = st.tabs(["Predicción Individual", "Carga Masiva", "Historial Clínico"])
 
 with tab1:
     st.subheader("Predicción Individual")
@@ -195,7 +204,6 @@ with tab1:
                 risk = predict_risk(row)
                 nivel, color, reco = get_risk_level(risk)
 
-                # Guardar
                 record = {
                     "nombre_paciente": nombre,
                     "user_id": st.session_state.user_id,
@@ -213,7 +221,6 @@ with tab1:
                 st.session_state.last_reco = reco
                 st.rerun()
 
-    # Mostrar resultado
     if "last_risk" in st.session_state:
         r = st.session_state.last_risk
         n = st.session_state.last_nivel
@@ -241,5 +248,75 @@ with tab3:
     else:
         st.info("Aún no hay registros")
 
-st.markdown("---")
-st.caption("NefroPredict RD © 2025 • Versión 100% funcional • Hecha con cariño para ti")
+# =============================================
+# PANEL DE ADMINISTRACIÓN (solo para admin)
+# =============================================
+if st.session_state.role == "admin":
+    st.markdown("---")
+    st.markdown("<h2 style='color:#CE1126;'>Panel de Administración</h2>", unsafe_allow_html=True)
+
+    tab_usuarios, tab_log = st.tabs(["Gestión de Doctores", "Historial Global"])
+
+    with tab_usuarios:
+        st.markdown("### Crear Nuevo Doctor")
+        with st.form("nuevo_doctor_form"):
+            nuevo_user = st.text_input("Nombre de usuario (ej: dr.martinez)").lower().strip()
+            nuevo_pwd = st.text_input("Contraseña inicial", type="password")
+            submit_nuevo = st.form_submit_button("Crear Doctor")
+
+            if submit_nuevo:
+                if not nuevo_user or not nuevo_pwd:
+                    st.error("Todos los campos son obligatorios")
+                elif db.get_user(nuevo_user):
+                    st.error("Ese usuario ya existe")
+                else:
+                    nuevo_id = f"dr_{int(time.time())}_{nuevo_user.split('.')[-1] if '.' in nuevo_user else nuevo_user}"
+                    data = db._load()
+                    data["users"][nuevo_user] = {
+                        "pwd": nuevo_pwd,
+                        "role": "doctor",
+                        "id": nuevo_id,
+                        "active": True
+                    }
+                    db._save(data)
+                    st.success(f"Doctor **{nuevo_user}** creado correctamente")
+                    st.rerun()
+
+        st.markdown("### Lista de Doctores")
+        users_data = db._load()["users"]
+        doctores = {k: v for k, v in users_data.items() if v["role"] == "doctor"}
+
+        if doctores:
+            df_doctores = pd.DataFrame([
+                {"Usuario": user, "ID": data["id"], "Estado": "Activo" if data.get("active", True) else "Inactivo"}
+                for user, data in doctores.items()
+            ])
+            st.dataframe(df_doctores, use_container_width=True, hide_index=True)
+
+            st.markdown("#### Cambiar estado o eliminar")
+            col1, col2 = st.columns(2)
+            with col1:
+                doctor_seleccionado = st.selectbox("Seleccionar doctor", options=[""] + list(doctores.keys()))
+            with col2:
+                if doctor_seleccionado:
+                    actual = doctores[doctor_seleccionado]
+                    nuevo_estado = not actual.get("active", True)
+                    estado_texto = "Desactivar" if actual.get("active", True) else "Activar"
+
+                    if st.button(f"{estado_texto} cuenta", key=f"toggle_{doctor_seleccionado}"):
+                        db.update_user(doctor_seleccionado, {"active": nuevo_estado})
+                        st.success(f"Cuenta de **{doctor_seleccionado}** {estado_texto.lower()}da")
+                        st.rerun()
+
+                    if st.button("Eliminar permanentemente", key=f"delete_{doctor_seleccionado}", type="primary"):
+                        if st.checkbox(f"Confirmar eliminación de **{doctor_seleccionado}** (no se puede deshacer)", key=f"confirm_{doctor_seleccionado}"):
+                            if db.delete_user(doctor_seleccionado):
+                                st.success(f"Doctor **{doctor_seleccionado}** eliminado del sistema")
+                                st.rerun()
+        else:
+            st.info("Aún no hay doctores registrados")
+
+    with tab_log:
+        st.info("Aquí aparecerá el historial de cargas masivas de todos los usuarios (próximamente)")
+
+st.caption("NefroPredict RD © 2025 • Versión completa con gestión de usuarios")
