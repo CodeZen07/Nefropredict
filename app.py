@@ -475,7 +475,7 @@ with tab1:
 with tab2:
     st.subheader("📤 Carga Masiva desde Excel/CSV")
     
-    col1, col2 = st.columns([1, 2])
+    col1, col2 = st.columns([1, 3])
     
     with col1:
         st.markdown("#### 📥 Descargar Plantilla")
@@ -493,72 +493,265 @@ with tab2:
         st.markdown("---")
         st.markdown("#### 📤 Subir Archivo")
         uploaded_file = st.file_uploader("Seleccionar archivo", type=["csv", "xlsx"])
+        
+        st.markdown("---")
+        st.info("💡 **Tip:** No es obligatorio tener todas las columnas. Los campos vacíos se marcarán en rojo.")
     
     with col2:
         if uploaded_file:
             try:
                 df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file)
-                req_cols = ["nombre_paciente", "edad", "imc", "presion_sistolica", "glucosa_ayunas", "creatinina"]
                 
-                if not all(c in df.columns for c in req_cols):
-                    st.error(f"❌ Faltan columnas. Requeridas: {', '.join(req_cols)}")
-                else:
-                    # Calcular riesgo para todos
-                    df["riesgo"] = df.apply(predecir, axis=1)
-                    df["nivel"] = df["riesgo"].apply(lambda x: riesgo_level(x)[0])
-                    df["recomendacion"] = df["riesgo"].apply(lambda x: riesgo_level(x)[2])
-                    
-                    # Guardar en BD
-                    for _, r in df.iterrows():
-                        db.add_patient({
-                            "nombre_paciente": r["nombre_paciente"],
-                            "doctor_user": st.session_state.username,
-                            "doctor_name": st.session_state.doctor_name,
-                            "timestamp": datetime.now().isoformat(),
-                            "edad": int(r["edad"]), "imc": float(r["imc"]),
-                            "presion_sistolica": int(r["presion_sistolica"]),
-                            "glucosa_ayunas": int(r["glucosa_ayunas"]),
-                            "creatinina": float(r["creatinina"]),
-                            "riesgo": float(r["riesgo"]), "nivel": r["nivel"]
-                        })
-                    
-                    # Log de carga
-                    db.add_upload_log({
+                # Columnas esperadas con valores por defecto
+                columnas_default = {
+                    "nombre_paciente": "Sin nombre",
+                    "edad": 50,
+                    "imc": 25.0,
+                    "presion_sistolica": 120,
+                    "glucosa_ayunas": 100,
+                    "creatinina": 1.0
+                }
+                
+                # Agregar columnas faltantes con valores por defecto
+                campos_faltantes = []
+                for col, default in columnas_default.items():
+                    if col not in df.columns:
+                        df[col] = default
+                        campos_faltantes.append(col)
+                
+                # Marcar valores vacíos/nulos
+                df["campos_vacios"] = ""
+                for col in columnas_default.keys():
+                    if col in df.columns:
+                        # Detectar valores vacíos
+                        mask = df[col].isna() | (df[col].astype(str).str.strip() == "")
+                        if mask.any():
+                            df.loc[mask, col] = columnas_default[col]
+                            df.loc[mask, "campos_vacios"] += f"{col}, "
+                
+                df["campos_vacios"] = df["campos_vacios"].str.rstrip(", ")
+                
+                if campos_faltantes:
+                    st.warning(f"⚠️ Columnas no encontradas (se usaron valores por defecto): {', '.join(campos_faltantes)}")
+                
+                # Calcular riesgo para todos
+                df["riesgo"] = df.apply(predecir, axis=1)
+                df["nivel"] = df["riesgo"].apply(lambda x: riesgo_level(x)[0])
+                df["color"] = df["riesgo"].apply(lambda x: riesgo_level(x)[1])
+                df["recomendacion"] = df["riesgo"].apply(lambda x: riesgo_level(x)[2])
+                
+                # Clasificar pacientes
+                df["categoria"] = df["riesgo"].apply(
+                    lambda x: "🔴 Crítico" if x > 70 else "🟡 Medio" if x > 40 else "🟢 Normal"
+                )
+                
+                # Guardar en BD
+                for _, r in df.iterrows():
+                    db.add_patient({
+                        "nombre_paciente": str(r["nombre_paciente"]),
                         "doctor_user": st.session_state.username,
                         "doctor_name": st.session_state.doctor_name,
                         "timestamp": datetime.now().isoformat(),
-                        "cantidad": len(df)
+                        "edad": int(r["edad"]), "imc": float(r["imc"]),
+                        "presion_sistolica": int(r["presion_sistolica"]),
+                        "glucosa_ayunas": int(r["glucosa_ayunas"]),
+                        "creatinina": float(r["creatinina"]),
+                        "riesgo": float(r["riesgo"]), "nivel": r["nivel"],
+                        "campos_vacios": r["campos_vacios"]
                     })
-                    
-                    # Métricas
-                    urgente = len(df[df["riesgo"] > 70])
-                    medio = len(df[(df["riesgo"] > 40) & (df["riesgo"] <= 70)])
-                    bajo = len(df[df["riesgo"] <= 40])
-                    
-                    st.success(f"✅ Procesados {len(df)} pacientes exitosamente")
-                    
-                    m1, m2, m3 = st.columns(3)
-                    m1.metric("🔴 Intervención URGENTE", urgente)
-                    m2.metric("🟡 Intervención Media", medio)
-                    m3.metric("🟢 Seguimiento Rutinario", bajo)
-                    
-                    # Gráfico de distribución
+                
+                # Log de carga
+                db.add_upload_log({
+                    "doctor_user": st.session_state.username,
+                    "doctor_name": st.session_state.doctor_name,
+                    "timestamp": datetime.now().isoformat(),
+                    "cantidad": len(df)
+                })
+                
+                # Conteos por categoría
+                criticos = df[df["riesgo"] > 70]
+                medios = df[(df["riesgo"] > 40) & (df["riesgo"] <= 70)]
+                normales = df[df["riesgo"] <= 40]
+                
+                st.success(f"✅ **{len(df)} pacientes procesados exitosamente**")
+                
+                # ========== TARJETAS DE RESUMEN ==========
+                st.markdown("### 📊 Resumen de Resultados")
+                
+                c1, c2, c3 = st.columns(3)
+                
+                with c1:
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, #ff6b6b, #ee5a5a); padding:25px; border-radius:15px; text-align:center; color:white; cursor:pointer;">
+                        <h1 style="margin:0; font-size:3.5em; color:white;">{len(criticos)}</h1>
+                        <h3 style="margin:5px 0; color:white;">🔴 CRÍTICOS</h3>
+                        <p style="margin:0; opacity:0.9;">Riesgo > 70%</p>
+                        <p style="margin:5px 0; font-weight:bold;">Intervención URGENTE</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with c2:
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, #feca57, #ff9f43); padding:25px; border-radius:15px; text-align:center; color:white;">
+                        <h1 style="margin:0; font-size:3.5em; color:white;">{len(medios)}</h1>
+                        <h3 style="margin:5px 0; color:white;">🟡 RIESGO MEDIO</h3>
+                        <p style="margin:0; opacity:0.9;">Riesgo 40-70%</p>
+                        <p style="margin:5px 0; font-weight:bold;">Control Estricto</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with c3:
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, #1dd1a1, #10ac84); padding:25px; border-radius:15px; text-align:center; color:white;">
+                        <h1 style="margin:0; font-size:3.5em; color:white;">{len(normales)}</h1>
+                        <h3 style="margin:5px 0; color:white;">🟢 NORMALES</h3>
+                        <p style="margin:0; opacity:0.9;">Riesgo < 40%</p>
+                        <p style="margin:5px 0; font-weight:bold;">Seguimiento Rutinario</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                st.markdown("---")
+                
+                # ========== GRÁFICOS ==========
+                st.markdown("### 📈 Visualización General")
+                
+                graf_col1, graf_col2 = st.columns(2)
+                
+                with graf_col1:
+                    # Gráfico de pastel
                     fig_pie = px.pie(
-                        values=[urgente, medio, bajo],
-                        names=['Urgente (>70%)', 'Medio (40-70%)', 'Bajo (<40%)'],
+                        values=[len(criticos), len(medios), len(normales)],
+                        names=['🔴 Críticos (>70%)', '🟡 Medio (40-70%)', '🟢 Normal (<40%)'],
                         color_discrete_sequence=['#CE1126', '#FFC400', '#4CAF50'],
-                        title="Distribución de Riesgo"
+                        title="📊 Distribución por Nivel de Riesgo",
+                        hole=0.4
                     )
+                    fig_pie.update_traces(textposition='inside', textinfo='percent+value')
+                    fig_pie.update_layout(height=400)
                     st.plotly_chart(fig_pie, use_container_width=True)
-                    
-                    # Tabla de resultados
-                    st.dataframe(
-                        df[["nombre_paciente", "edad", "creatinina", "riesgo", "nivel"]].sort_values("riesgo", ascending=False),
-                        use_container_width=True,
-                        hide_index=True
+                
+                with graf_col2:
+                    # Gráfico de barras horizontal por paciente
+                    df_sorted = df.sort_values("riesgo", ascending=True).tail(15)
+                    fig_bar = px.bar(
+                        df_sorted,
+                        y="nombre_paciente",
+                        x="riesgo",
+                        orientation='h',
+                        color="riesgo",
+                        color_continuous_scale=["#4CAF50", "#FFC400", "#CE1126"],
+                        title="📊 Top 15 Pacientes por Riesgo",
+                        text="riesgo"
                     )
+                    fig_bar.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
+                    fig_bar.update_layout(height=400, showlegend=False)
+                    fig_bar.add_vline(x=70, line_dash="dash", line_color="red", annotation_text="Crítico")
+                    fig_bar.add_vline(x=40, line_dash="dash", line_color="orange", annotation_text="Medio")
+                    st.plotly_chart(fig_bar, use_container_width=True)
+                
+                st.markdown("---")
+                
+                # ========== FILTRO POR CATEGORÍA ==========
+                st.markdown("### 🔍 Ver Pacientes por Categoría")
+                
+                filtro_cat = st.radio(
+                    "Seleccionar categoría:",
+                    ["📋 Todos", "🔴 Críticos", "🟡 Riesgo Medio", "🟢 Normales"],
+                    horizontal=True
+                )
+                
+                if filtro_cat == "🔴 Críticos":
+                    df_mostrar = criticos
+                elif filtro_cat == "🟡 Riesgo Medio":
+                    df_mostrar = medios
+                elif filtro_cat == "🟢 Normales":
+                    df_mostrar = normales
+                else:
+                    df_mostrar = df
+                
+                if len(df_mostrar) > 0:
+                    # Función para colorear filas
+                    def colorear_fila(row):
+                        if row["riesgo"] > 70:
+                            return ['background-color: #ffe5e5'] * len(row)
+                        elif row["riesgo"] > 40:
+                            return ['background-color: #fff4e5'] * len(row)
+                        else:
+                            return ['background-color: #e5f7e5'] * len(row)
+                    
+                    # Función para marcar campos vacíos en rojo
+                    def marcar_vacios(row):
+                        styles = [''] * len(row)
+                        campos_vacios = str(row.get("campos_vacios", "")).split(", ")
+                        for i, col in enumerate(row.index):
+                            if col in campos_vacios and col != "campos_vacios":
+                                styles[i] = 'background-color: #ffcccc; color: red; font-weight: bold;'
+                        return styles
+                    
+                    columnas_mostrar = ["nombre_paciente", "edad", "imc", "presion_sistolica", 
+                                       "glucosa_ayunas", "creatinina", "riesgo", "nivel", "campos_vacios"]
+                    columnas_disponibles = [c for c in columnas_mostrar if c in df_mostrar.columns]
+                    
+                    df_styled = df_mostrar[columnas_disponibles].style.apply(colorear_fila, axis=1)
+                    
+                    st.dataframe(df_styled, use_container_width=True, hide_index=True, height=400)
+                    
+                    # Mostrar leyenda
+                    st.markdown("""
+                    **Leyenda de colores:**
+                    - 🔴 Fondo rojo claro = Paciente crítico (>70%)
+                    - 🟡 Fondo amarillo claro = Riesgo medio (40-70%)
+                    - 🟢 Fondo verde claro = Normal (<40%)
+                    - 📛 Texto rojo en campo = Valor no proporcionado (se usó valor por defecto)
+                    """)
+                else:
+                    st.info("No hay pacientes en esta categoría")
+                
+                # ========== SELECTOR DE PACIENTE INDIVIDUAL ==========
+                st.markdown("---")
+                st.markdown("### 👤 Ver Detalle de Paciente")
+                
+                paciente_sel = st.selectbox(
+                    "Seleccionar paciente para ver detalle:",
+                    [""] + df["nombre_paciente"].tolist()
+                )
+                
+                if paciente_sel:
+                    pac_data = df[df["nombre_paciente"] == paciente_sel].iloc[0]
+                    
+                    col_det1, col_det2 = st.columns([1, 1])
+                    
+                    with col_det1:
+                        st.markdown(f"#### 📋 {pac_data['nombre_paciente']}")
+                        
+                        # Gauge de riesgo
+                        st.plotly_chart(crear_gauge_riesgo(pac_data["riesgo"]), use_container_width=True)
+                    
+                    with col_det2:
+                        st.markdown("#### 📊 Datos Clínicos")
+                        
+                        datos_tabla = {
+                            "Parámetro": ["Edad", "IMC", "Presión Sistólica", "Glucosa Ayunas", "Creatinina"],
+                            "Valor": [
+                                f"{pac_data['edad']} años",
+                                f"{pac_data['imc']:.1f} kg/m²",
+                                f"{pac_data['presion_sistolica']} mmHg",
+                                f"{pac_data['glucosa_ayunas']} mg/dL",
+                                f"{pac_data['creatinina']:.2f} mg/dL"
+                            ],
+                            "Rango Normal": ["18-65", "18.5-24.9", "90-120", "70-100", "0.7-1.3"]
+                        }
+                        st.table(pd.DataFrame(datos_tabla))
+                        
+                        nivel, color, reco = riesgo_level(pac_data["riesgo"])
+                        st.markdown(f"**Recomendación:** {reco}")
+                        
+                        if pac_data["campos_vacios"]:
+                            st.warning(f"⚠️ Campos no proporcionados: {pac_data['campos_vacios']}")
+                
             except Exception as e:
                 st.error(f"❌ Error al procesar archivo: {str(e)}")
+                st.info("Asegúrate de que el archivo tenga al menos una columna con datos numéricos o nombres de pacientes.")
 
 # =============================================
 # TAB 3: HISTORIAL
