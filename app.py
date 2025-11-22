@@ -330,4 +330,4 @@ with tab1:
 
 # (El resto de pestañas funcionan igual — puedes copiar tu código original aquí)
 
-st.caption("© 2025 KHAZAD • Tecnología al servicio de la salud dominicana")
+st.caption("Tecnología al servicio de la salud dominicana")
