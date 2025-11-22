@@ -143,16 +143,16 @@ class DataStore:
                 "dr.sanchez": {"pwd": "pass3", "role": "doctor", "id": "dr_sanchez_uid_003", "active": False},
             },
             "file_history": [
-                {"usuario": "dr.perez", "user_id": "dr_perez_uid_001", "timestamp": "2025-05-02 14:30", "filename": "Mis_Pacientes_Q1_2025.xlsx", "patients": 55},
-                {"usuario": "dr.gomez", "user_id": "dr_gomez_uid_002", "timestamp": "2025-05-01 11:00", "filename": "Pacientes_HTA.xlsx", "patients": 80},
+                {"usuario": "dr.perez", "user_id": "dr_perez_uid_001", "timestamp": "2025-05-02 14:30", "filename": "Mis_Pacientes_Q1_2025.xlsx", "patients": 55, "high_risk_count": 12},
+                {"usuario": "dr.gomez", "user_id": "dr_gomez_uid_002", "timestamp": "2025-05-01 11:00", "filename": "Pacientes_HTA.xlsx", "patients": 80, "high_risk_count": 25},
             ],
             # COLECCIÓN PARA REGISTROS INDIVIDUALES DE PACIENTES
             "patient_records": [
                 # Ejemplo 1: Paciente de Alto Riesgo Inicial que ha sido evaluado dos veces
-                {"nombre_paciente": "Maria Almonte", "user_id": "dr_perez_uid_001", "usuario": "dr.perez", "timestamp": "2024-10-01 10:00:00", "edad": 60, "creatinina": 1.9, "glucosa_ayunas": 190, "risk": 78.0, "nivel": "MUY ALTO", "color": "#CE1126", "html_report": "<!-- Reporte inicial de Maria Almonte (simulado) -->"},
-                {"nombre_paciente": "Maria Almonte", "user_id": "dr_perez_uid_001", "usuario": "dr.perez", "timestamp": "2025-01-15 11:30:00", "edad": 60, "creatinina": 1.5, "glucosa_ayunas": 140, "risk": 55.0, "nivel": "ALTO", "color": "#FFC400", "html_report": "<!-- Reporte intermedio de Maria Almonte (simulado) -->"},
+                {"nombre_paciente": "Maria Almonte", "user_id": "dr_perez_uid_001", "usuario": "dr.perez", "timestamp": "2024-10-01 10:00:00", "edad": 60, "imc": 30.1, "presion_sistolica": 160, "creatinina": 1.9, "glucosa_ayunas": 190, "risk": 78.0, "nivel": "MUY ALTO", "color": "#CE1126", "html_report": "<!-- Reporte inicial de Maria Almonte (simulado) -->"},
+                {"nombre_paciente": "Maria Almonte", "user_id": "dr_perez_uid_001", "usuario": "dr.perez", "timestamp": "2025-01-15 11:30:00", "edad": 60, "imc": 28.5, "presion_sistolica": 140, "creatinina": 1.5, "glucosa_ayunas": 140, "risk": 55.0, "nivel": "ALTO", "color": "#FFC400", "html_report": "<!-- Reporte intermedio de Maria Almonte (simulado) -->"},
                 # Ejemplo 2: Paciente de Bajo Riesgo
-                {"nombre_paciente": "Juan Perez", "user_id": "dr_gomez_uid_002", "usuario": "dr.gomez", "timestamp": "2025-05-02 12:00:00", "edad": 45, "creatinina": 1.0, "glucosa_ayunas": 95, "risk": 20.0, "nivel": "MODERADO", "color": "#4CAF50", "html_report": "<!-- Reporte único de Juan Perez (simulado) -->"},
+                {"nombre_paciente": "Juan Perez", "user_id": "dr_gomez_uid_002", "usuario": "dr.gomez", "timestamp": "2025-05-02 12:00:00", "edad": 45, "imc": 24.0, "presion_sistolica": 120, "creatinina": 1.0, "glucosa_ayunas": 95, "risk": 20.0, "nivel": "MODERADO", "color": "#4CAF50", "html_report": "<!-- Reporte único de Juan Perez (simulado) -->"},
             ]
         }
         
@@ -231,10 +231,10 @@ class DataStore:
         """Obtiene el historial de predicciones de un paciente por NOMBRE."""
         db = self._read_db()
         # Búsqueda insensible a mayúsculas/minúsculas
-        return [
+        return sorted([
             record for record in db.get('patient_records', []) 
             if record.get('nombre_paciente', '').lower() == patient_name.lower()
-        ]
+        ], key=lambda x: x['timestamp'], reverse=True)
 
 # Inicializamos el DataStore (simulando la conexión a Firestore)
 db_store = DataStore(DB_FILE_PATH)
@@ -255,6 +255,7 @@ def load_model(path):
         st.sidebar.error(f"⚠️ Error al cargar el modelo. Usando modo simulación. ({e})")
         return None
 
+# El modelo joblib debe estar en el mismo directorio. Si no lo está, usará simulación.
 nefro_model = load_model('modelo_erc.joblib')
 model_loaded = nefro_model is not None
 
@@ -359,6 +360,7 @@ def get_risk_level(risk):
 
 def predict_risk(data_series):
     """Realiza la predicción de riesgo (real o simulada) a partir de una Serie de Pandas."""
+    # Aseguramos que solo las columnas necesarias estén presentes y en orden
     data = data_series[['edad', 'imc', 'presion_sistolica', 'glucosa_ayunas', 'creatinina']].to_frame().T
     
     if model_loaded:
@@ -386,26 +388,32 @@ def generate_explanation_data(row):
     edad = row.get('edad', 50) 
     imc = row.get('imc', 25.0) 
 
-    # Lógica de Contribución:
-    if creatinina > 2.0: contributions['Creatinina'] = 0.40
-    elif creatinina > 1.3: contributions['Creatinina'] = 0.25
-    else: contributions['Creatinina'] = -0.10
+    # Lógica de Contribución (Aumento/Disminución del riesgo base):
+    # Creatinina
+    if creatinina > 2.0: contributions['Creatinina (Alto)'] = 0.40
+    elif creatinina > 1.3: contributions['Creatinina (Elevado)'] = 0.25
+    else: contributions['Creatinina (Normal)'] = -0.10
     
-    if glucosa > 125: contributions['Glucosa Ayunas'] = 0.20
-    elif glucosa > 100: contributions['Glucosa Ayunas'] = 0.05
-    else: contributions['Glucosa Ayunas'] = -0.05
+    # Glucosa Ayunas
+    if glucosa > 125: contributions['Glucosa Ayunas (Diabetes)'] = 0.20
+    elif glucosa > 100: contributions['Glucosa Ayunas (Pre-Diab)'] = 0.05
+    else: contributions['Glucosa Ayunas (Normal)'] = -0.05
 
-    if presion > 140: contributions['Presión Sistólica'] = 0.15
-    elif presion > 130: contributions['Presión Sistólica'] = 0.05
-    else: contributions['Presión Sistólica'] = -0.05
+    # Presión Sistólica
+    if presion > 140: contributions['Presión Sistólica (HTA)'] = 0.15
+    elif presion > 130: contributions['Presión Sistólica (Pre-HTA)'] = 0.05
+    else: contributions['Presión Sistólica (Normal)'] = -0.05
         
-    if edad > 65: contributions['Edad'] = 0.10
-    else: contributions['Edad'] = -0.03
+    # Edad
+    if edad > 65: contributions['Edad (Mayor de 65)'] = 0.10
+    else: contributions['Edad (Menor de 65)'] = -0.03
 
+    # IMC
     if imc > 30.0: contributions['IMC (Obesidad)'] = 0.08
-    elif imc < 18.5: contributions['IMC (Bajo Peso)'] = 0.03
-    else: contributions['IMC'] = -0.02
+    elif imc < 18.5: contributions['IMC (Bajo Peso)'] = 0.03 # También es un factor de riesgo leve
+    else: contributions['IMC (Normal)'] = -0.02
 
+    # Normalizar las contribuciones para que el gráfico sea más informativo (total de impactos absolutos = 1)
     total_abs = sum(abs(v) for v in contributions.values())
     if total_abs > 0:
         contributions = {k: v / total_abs for k, v in contributions.items()}
@@ -417,9 +425,10 @@ def display_explanation_charts(data):
     
     df_chart = pd.DataFrame(data.items(), columns=['Factor', 'Contribucion_Normalizada'])
     df_chart['Riesgo_Impacto'] = np.where(df_chart['Contribucion_Normalizada'] > 0, 'Aumenta Riesgo', 'Disminuye Riesgo')
+    df_chart['Color'] = np.where(df_chart['Contribucion_Normalizada'] > 0, '#CE1126', '#4CAF50') # Rojo o Verde
 
     st.markdown("#### 📈 Contribución Individual de Factores")
-    st.bar_chart(df_chart, x='Factor', y='Contribucion_Normalizada', color='Riesgo_Impacto', use_container_width=True)
+    st.bar_chart(df_chart, x='Factor', y='Contribucion_Normalizada', color='Color', use_container_width=True)
     st.markdown("<p style='font-size: 0.8em; text-align: center; color: #888;'>Las barras rojas representan un factor que aumenta el riesgo. Las barras verdes lo disminuyen.</p>", unsafe_allow_html=True)
 
 
@@ -469,7 +478,7 @@ def generate_individual_report_html(patient_data, risk_percentage, doctor_name, 
                 .data-table th, .data-table td {{ border: 1px solid #ddd; padding: 10px; text-align: left; }}
                 .data-table th {{ background-color: #f0f0f0; }}
                 .recommendation {{ margin-top: 30px; padding: 15px; border-left: 5px solid {color}; background-color: #f5f5f5; border-radius: 4px; }}
-                .explanation-table {{ width: 60%; border-collapse: collapse; margin-top: 10px; float: right;}}
+                .explanation-table {{ width: 100%; border-collapse: collapse; margin-top: 10px;}}
                 .explanation-table th, .explanation-table td {{ padding: 8px; text-align: left; border: none; border-bottom: 1px dotted #ccc;}}
             }}
             /* Estilos para visualización en Streamlit */
@@ -508,7 +517,7 @@ def generate_individual_report_html(patient_data, risk_percentage, doctor_name, 
             <h2>Análisis de Contribución al Riesgo</h2>
             <p>Factores que influyen en el resultado predictivo:</p>
             <table class="explanation-table">
-                <tr><th>Factor</th><th>Impacto</th></tr>
+                <tr><th>Factor</th><th>Impacto Normalizado</th></tr>
                 {explanation_rows}
             </table>
             <div style="clear: both;"></div>
@@ -553,6 +562,19 @@ def get_excel_template():
     return processed_data
 
 
+# --- 7. Funciones de Cálculo Adicionales (eGFR) ---
+
+def calculate_egfr(creatinine, age, sex):
+    """Calcula eGFR usando la fórmula CKD-EPI 2009 (sin raza, para simplificar)."""
+    k = 0.7 if sex == 'F' else 0.9
+    a = -0.329 if sex == 'F' else -0.411
+    
+    # CKD-EPI 2009 (Formula simplificada y ampliamente usada)
+    egfr_val = 141 * (min(creatinine / k, 1)**a) * (max(creatinine / k, 1)**-1.209) * (0.993**age) * (1.018 if sex == 'F' else 1)
+    
+    return egfr_val.round(1)
+
+
 # --- 7. Interfaz del Médico (Estructura de pestañas) ---
 if st.session_state.user_role == 'doctor' or st.session_state.user_role == 'admin':
     
@@ -568,7 +590,7 @@ if st.session_state.user_role == 'doctor' or st.session_state.user_role == 'admi
     ])
 
     # =================================================================
-    # 7.1 PESTAÑA DE PREDICCIÓN INDIVIDUAL
+    # 7.1 PESTAÑA DE PREDICCIÓN INDIVIDUAL (Original + Resultado)
     # =================================================================
     with tab_individual:
         st.markdown("#### Ingreso de Datos de un Único Paciente")
@@ -621,6 +643,8 @@ if st.session_state.user_role == 'doctor' or st.session_state.user_role == 'admi
                     "usuario": st.session_state.username,
                     "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
                     "edad": patient_data['edad'],
+                    "imc": patient_data['imc'],
+                    "presion_sistolica": patient_data['presion_sistolica'],
                     "creatinina": patient_data['creatinina'],
                     "glucosa_ayunas": patient_data['glucosa_ayunas'],
                     "risk": risk_percentage,
@@ -643,7 +667,6 @@ if st.session_state.user_role == 'doctor' or st.session_state.user_role == 'admi
 
         if 'last_individual_report' in st.session_state:
             report_data = st.session_state.last_individual_report
-            patient_name = report_data['data']['nombre_paciente']
             risk_percentage = report_data['risk']
             nivel, color, recomendacion = get_risk_level(risk_percentage)
             
@@ -651,8 +674,6 @@ if st.session_state.user_role == 'doctor' or st.session_state.user_role == 'admi
             st.markdown("### 3. Resultados y Reporte Instantáneo")
             
             # --- MEJORA VISUAL: MEDIDOR DE RIESGO ESTILIZADO ---
-            
-            # Calcular la posición del marcador (0 a 100%)
             marker_position = risk_percentage 
             
             st.markdown(f"""
@@ -721,306 +742,388 @@ if st.session_state.user_role == 'doctor' or st.session_state.user_role == 'admi
                     st.rerun()
 
         with col_template:
-            excel_data = get_excel_template()
+            st.markdown("##### 📥 Descargar Plantilla")
             st.download_button(
-                label="⬇️ Descargar Plantilla",
-                data=excel_data,
-                file_name="NefroPredict_Plantilla_Vaciado.xlsx",
+                label="Descargar Plantilla Excel",
+                data=get_excel_template(),
+                file_name="Plantilla_NefroPredict_RD.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                help="Utiliza esta plantilla para asegurar el formato correcto de las columnas."
+                help="Plantilla con columnas requeridas: id_paciente, edad, imc, presion_sistolica, glucosa_ayunas, creatinina."
             )
-        
-        if uploaded is not None:
+            
+        if uploaded:
             try:
-                # Leer el archivo
-                df = pd.read_excel(uploaded, engine='openpyxl')
-                required_cols = ['edad', 'imc', 'presion_sistolica', 'glucosa_ayunas', 'creatinina']
-                
-                # Validar columnas
+                # 1. Lectura
+                df = pd.read_excel(uploaded)
+                st.success(f"Archivo '{uploaded.name}' cargado. {len(df)} registros encontrados.")
+
+                # 2. Validación de Columnas
+                required_cols = ['id_paciente', 'edad', 'imc', 'presion_sistolica', 'glucosa_ayunas', 'creatinina']
                 if not all(col in df.columns for col in required_cols):
-                    st.error(f"El archivo debe contener las siguientes columnas (revisar la plantilla): {', '.join(required_cols)}")
+                    missing = [col for col in required_cols if col not in df.columns]
+                    st.error(f"Faltan columnas requeridas en el archivo: {', '.join(missing)}")
                     st.stop()
 
-                st.markdown("---")
-                st.markdown(f"#### Procesando {len(df)} pacientes...")
+                # 3. Limpieza y Conversión de Datos (Asegurar tipos numéricos)
+                df[required_cols[1:]] = df[required_cols[1:]].apply(pd.to_numeric, errors='coerce')
+                df.dropna(subset=required_cols[1:], inplace=True)
+                if df.empty:
+                    st.error("No hay datos válidos para procesar después de la limpieza de Nulos.")
+                    st.stop()
+                st.info(f"Procesando {len(df)} registros válidos...")
                 
-                # Aplicar la predicción
-                with st.spinner("Realizando predicciones..."):
-                    df['risk_percentage'] = df.apply(predict_risk, axis=1)
-                    df[['risk_level', 'risk_color', 'recommendation']] = df['risk_percentage'].apply(lambda x: pd.Series(get_risk_level(x)))
+                # 4. Predicción Masiva
+                progress_bar = st.progress(0)
+                results = []
+                for i, row in df.iterrows():
+                    # Crear una Serie de Pandas con los datos necesarios para la predicción
+                    patient_data = pd.Series({
+                        'edad': row['edad'],
+                        'imc': row['imc'],
+                        'presion_sistolica': row['presion_sistolica'],
+                        'glucosa_ayunas': row['glucosa_ayunas'],
+                        'creatinina': row['creatinina']
+                    })
+                    
+                    risk = predict_risk(patient_data)
+                    nivel, color, recomendacion = get_risk_level(risk)
+                    
+                    results.append({
+                        'ID_Paciente': row['id_paciente'],
+                        'Edad': row['edad'],
+                        'IMC': f"{row['imc']:.1f}",
+                        'Presion_Sistolica': row['presion_sistolica'],
+                        'Glucosa_Ayunas': row['glucosa_ayunas'],
+                        'Creatinina': f"{row['creatinina']:.2f}",
+                        'Riesgo_ERC_5_años (%)': risk,
+                        'Nivel_Riesgo': nivel,
+                        'Recomendacion_Clinica': recomendacion
+                    })
+                    progress_bar.progress((i + 1) / len(df))
 
-                st.success(f"Procesamiento completado para {len(df)} pacientes.")
-                
-                # Guardar el resultado en la sesión
-                st.session_state.last_mass_df = df
+                df_results = pd.DataFrame(results)
+                progress_bar.empty()
+
+                # 5. Guardar en Sesión y Historial
+                st.session_state.last_mass_df = df_results
                 st.session_state.last_mass_filename = uploaded.name
-
-                # Registrar la operación en el historial
+                
                 record = {
                     "usuario": st.session_state.username,
                     "user_id": st.session_state.user_id,
                     "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
                     "filename": uploaded.name,
-                    "patients": len(df)
+                    "patients": len(df_results),
+                    "high_risk_count": len(df_results[df_results['Nivel_Riesgo'].isin(['ALTO', 'MUY ALTO'])])
                 }
                 db_store.add_file_record(record)
-                st.rerun() # Para forzar la actualización de la visualización
-
+                
+                st.success(f"Predicciones completadas para {len(df_results)} pacientes.")
+                time.sleep(0.1)
+                st.rerun() 
+                
             except Exception as e:
-                st.error(f"Ocurrió un error al procesar el archivo: {e}")
-                st.exception(e)
-
-        # Mostrar resultados si existen
+                st.error(f"Ocurrió un error durante la carga o el procesamiento: {e}")
+        
         if 'last_mass_df' in st.session_state and st.session_state.last_mass_df is not None:
             st.markdown("---")
-            st.markdown(f"### Resultados Masivos para: {st.session_state.last_mass_filename}")
+            st.markdown(f"#### Resultados de la Carga Masiva: *{st.session_state.last_mass_filename}*")
+            df_display = st.session_state.last_mass_df.copy()
+
+            # Estilizado de la tabla para visualización
+            def color_risk(val):
+                if val == 'MUY ALTO':
+                    return 'background-color: #CE1126; color: white'
+                elif val == 'ALTO':
+                    return 'background-color: #FFC400'
+                elif val == 'MODERADO':
+                    return 'background-color: #4CAF50; color: white'
+                return ''
             
-            # Resumen de KPIs
-            df_result = st.session_state.last_mass_df
-            total_patients = len(df_result)
-            high_risk = len(df_result[df_result['risk_level'].isin(['ALTO', 'MUY ALTO'])])
-            high_risk_pct = (high_risk / total_patients) * 100 if total_patients > 0 else 0
-
-            col_kpi_1, col_kpi_2, col_kpi_3 = st.columns(3)
-            col_kpi_1.metric("Total de Pacientes", total_patients)
-            col_kpi_2.metric("Pacientes Alto/Muy Alto Riesgo", high_risk, delta=f"{high_risk_pct:.1f}% del total")
-            col_kpi_3.metric("Riesgo Promedio", f"{df_result['risk_percentage'].mean():.1f}%")
-
             st.dataframe(
-                df_result.style.background_gradient(subset=['risk_percentage'], cmap='RdYlGn_r'),
+                df_display.style.applymap(color_risk, subset=['Nivel_Riesgo']),
                 use_container_width=True
             )
 
             # Descarga de resultados
-            output = io.BytesIO()
-            df_display = df_result.rename(columns={'risk_percentage': 'Riesgo (%)', 'risk_level': 'Nivel de Riesgo', 'recommendation': 'Recomendación Clínica'})
-            
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                # Seleccionar columnas relevantes para el reporte de descarga
-                cols_to_save = [c for c in df_display.columns if c not in ['risk_color']]
-                df_display[cols_to_save].to_excel(writer, sheet_name='Resultados_NefroPredict', index=False)
-            processed_data = output.getvalue()
-
+            st.markdown("##### ⬇️ Descargar Resultados con Predicción")
+            csv = df_display.to_csv(index=False).encode('utf-8')
             st.download_button(
-                label="⬇️ Descargar Resultados con Recomendaciones (Excel)",
-                data=processed_data,
-                file_name=f"Resultados_NefroPredict_{time.strftime('%Y%m%d_%H%M%S')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                type="primary"
+                label="Descargar CSV con Resultados",
+                data=csv,
+                file_name=f"Resultados_{st.session_state.last_mass_filename.replace('.xlsx', '').replace('.xls', '')}_{time.strftime('%Y%m%d')}.csv",
+                mime="text/csv",
+                key="download_mass_results"
             )
+
 
     # =================================================================
     # 7.3 PESTAÑA DE HISTORIAL CLÍNICO INDIVIDUAL
     # =================================================================
     with tab_patient_history:
-        st.markdown("### 📂 Historial de Predicciones por Paciente")
-        st.info("Busca un paciente por su nombre completo para ver la evolución de su riesgo de ERC a lo largo del tiempo, según las evaluaciones previas.")
+        st.markdown("#### 📂 Búsqueda y Trazabilidad del Paciente")
+        st.info("Busca un paciente por su nombre completo para ver el historial de sus evaluaciones de riesgo.")
         
-        patient_search_name = st.text_input("Buscar Paciente por Nombre (Ej: Maria Almonte)", key="search_patient_name")
+        search_name = st.text_input("Ingresa el Nombre del Paciente:", key="patient_search_name").strip()
         
-        if patient_search_name:
-            records = db_store.get_patient_records(patient_search_name)
+        if search_name:
+            history = db_store.get_patient_records(search_name)
             
-            if records:
-                # Filtrar para el usuario actual (o todos si es admin, aunque la simulación no lo hace, mantenemos el filtro implícito)
-                # Para un sistema multiusuario real (Firestore), el filtro ya se aplicaría por seguridad. Aquí mostramos todos los registros por nombre.
-                st.success(f"Se encontraron {len(records)} registros para **{patient_search_name}**.")
-                
-                # Crear DataFrame para la visualización de la evolución
-                df_history = pd.DataFrame(records)
-                df_history['timestamp'] = pd.to_datetime(df_history['timestamp'])
-                df_history = df_history.sort_values(by='timestamp', ascending=False).reset_index(drop=True)
-                
-                # Gráfico de evolución
-                st.markdown("#### Evolución del Riesgo de ERC")
-                st.line_chart(df_history.set_index('timestamp')['risk'], y_label="Riesgo (%)", use_container_width=True)
-                
-                st.markdown("#### Detalle de Evaluaciones")
-                
-                # Mostrar historial de registros y permitir ver reporte
-                for i, row in df_history.iterrows():
-                    with st.expander(f"Evaluación {len(df_history)-i}: {row['timestamp'].strftime('%Y-%m-%d')} - Riesgo: {row['risk']:.1f}% ({row['nivel']}) - Dr. {row['usuario']}"):
-                        st.markdown(f"**Datos:** Edad: {row['edad']} años | Creatinina: {row['creatinina']:.2f} mg/dL | Glucosa: {row['glucosa_ayunas']} mg/dL")
-                        
-                        # Botón para ver el reporte HTML guardado
-                        report_html_key = f"view_report_{row['timestamp'].timestamp()}_{i}"
-                        if st.button(f"Ver Reporte Detallado", key=report_html_key):
-                            st.components.v1.html(row['html_report'], height=700, scrolling=True)
-                
+            if not history:
+                st.warning(f"No se encontraron registros de predicción para '{search_name}'.")
             else:
-                st.warning(f"No se encontraron registros de predicción individual para '{patient_search_name}'.")
+                st.success(f"Se encontraron {len(history)} evaluaciones para '{search_name}'.")
+                
+                # Crear DataFrame para mostrar la tabla de historial
+                history_df = pd.DataFrame([
+                    {
+                        "Fecha y Hora": record['timestamp'],
+                        "Dr. que evaluó": record['usuario'],
+                        "Edad": record['edad'],
+                        "Creatinina": f"{record['creatinina']:.2f}",
+                        "Glucosa": record['glucosa_ayunas'],
+                        "Riesgo (%)": f"{record['risk']:.1f}",
+                        "Nivel": record['nivel'],
+                        "Reporte HTML": record['html_report'] # Mantener el reporte para selección
+                    }
+                    for record in history
+                ])
+                
+                # Estilizado de la tabla de historial
+                def color_history_risk(val):
+                    if val == 'MUY ALTO': return 'background-color: #CE1126; color: white'
+                    if val == 'ALTO': return 'background-color: #FFC400'
+                    if val == 'MODERADO': return 'background-color: #4CAF50; color: white'
+                    return ''
+
+                st.markdown("##### Historial de Evaluaciones")
+                st.dataframe(
+                    history_df[['Fecha y Hora', 'Dr. que evaluó', 'Edad', 'Creatinina', 'Riesgo (%)', 'Nivel']].style.applymap(color_history_risk, subset=['Nivel']),
+                    use_container_width=True,
+                    hide_index=True
+                )
+                
+                # Gráfico de progresión del riesgo
+                st.markdown("##### 📉 Progresión de Riesgo a lo Largo del Tiempo")
+                chart_df = history_df.sort_values(by='Fecha y Hora')
+                chart_df['Riesgo (%)'] = chart_df['Riesgo (%)'].astype(float)
+                
+                st.line_chart(chart_df, x='Fecha y Hora', y='Riesgo (%)', color='#002868')
+                
+                # Selector de Reporte
+                st.markdown("---")
+                st.markdown("##### Ver Reporte Detallado")
+                
+                selected_time = st.selectbox(
+                    "Selecciona la fecha y hora de la evaluación a revisar:",
+                    chart_df['Fecha y Hora']
+                )
+                
+                if selected_time:
+                    selected_record = history_df[history_df['Fecha y Hora'] == selected_time].iloc[0]
+                    report_html = selected_record['Reporte HTML']
+                    
+                    st.markdown(f"#### Reporte del {selected_time}")
+                    st.components.v1.html(report_html, height=600, scrolling=True)
+
 
     # =================================================================
     # 7.4 PESTAÑA DE OTROS CÁLCULOS CLÍNICOS (eGFR)
     # =================================================================
     with tab_otros:
-        st.markdown("### ⭐ Cálculos Clínicos Auxiliares")
-        st.info("Herramientas adicionales para la clasificación y estadificación de la Enfermedad Renal Crónica.")
+        st.markdown("#### ⭐ Calculadora de Tasa de Filtración Glomerular Estimada (eGFR)")
+        st.info("Utiliza la fórmula CKD-EPI (2009) para estimar la función renal y clasificar según los estadios KDIGO.")
         
-        st.markdown("#### Tasa de Filtración Glomerular Estimada (TFG/eGFR) - Fórmula CKD-EPI 2021 (sin raza)")
-        
-        with st.form("egfr_calc_form"):
-            col_egfr_1, col_egfr_2, col_egfr_3 = st.columns(3)
-            with col_egfr_1:
-                egfr_creatinina = st.number_input("Creatinina sérica (mg/dL)", min_value=0.1, max_value=10.0, value=1.0, step=0.01, format="%.2f", key="egfr_creatinina")
-            with col_egfr_2:
-                egfr_edad = st.number_input("Edad (años)", min_value=18, max_value=120, value=55, key="egfr_edad")
-            with col_egfr_3:
-                egfr_sexo = st.selectbox("Sexo Biológico", ["Femenino", "Masculino"], key="egfr_sexo")
+        with st.form("egfr_form"):
+            col_egfr1, col_egfr2 = st.columns(2)
             
-            calculate_egfr = st.form_submit_button("Calcular eGFR y Estadificación")
+            with col_egfr1:
+                egfr_creatinina = st.number_input("Creatinina Sérica (mg/dL)", min_value=0.1, max_value=10.0, value=1.0, step=0.01, format="%.2f", key="egfr_creatinina")
+                egfr_edad = st.number_input("Edad (años)", min_value=1, max_value=120, value=55, key="egfr_edad")
+
+            with col_egfr2:
+                egfr_sexo = st.selectbox("Sexo Biológico", options=['M', 'F'], key="egfr_sexo")
+                
+            egfr_submitted = st.form_submit_button("Calcular eGFR")
             
-            if calculate_egfr:
-                # Constantes CKD-EPI 2021 (no race)
-                kappa = 0.7 if egfr_sexo == "Femenino" else 0.9
-                alpha = -0.241 if egfr_sexo == "Femenino" else -0.411
-                factor_sexo = 1.012 if egfr_sexo == "Femenino" else 1.0
+            if egfr_submitted:
+                egfr_result = calculate_egfr(egfr_creatinina, egfr_edad, egfr_sexo)
                 
-                min_crea = min(egfr_creatinina / kappa, 1)
-                max_crea = max(egfr_creatinina / kappa, 1)
-                
-                # CKD-EPI 2021 formula
-                # eGFR = 142 * min(Crea/kappa, 1)^alpha * max(Crea/kappa, 1)^-1.200 * factor_sexo * 0.9938^Age
-                eGFR = 142 * (min_crea ** alpha) * (max_crea ** -1.200) * (factor_sexo) * (0.9938 ** egfr_edad)
-                eGFR = round(eGFR, 2)
-                
-                # Estadificación K/DOQI
-                if eGFR >= 90:
+                # Clasificación KDIGO
+                if egfr_result >= 90:
                     stage = "G1 (Normal o Alto)"
-                    stage_color = "#4CAF50"
-                    stage_desc = "Función renal normal."
-                elif eGFR >= 60:
-                    stage = "G2 (Ligeramente Disminuida)"
-                    stage_color = "#A3D900"
-                    stage_desc = "Función renal ligeramente disminuida, generalmente asintomático. Monitoreo anual."
-                elif eGFR >= 45:
-                    stage = "G3a (Disminución Leve a Moderada)"
-                    stage_color = "#FFC400"
-                    stage_desc = "Riesgo moderado de complicaciones. Se requiere control de presión y glucosa."
-                elif eGFR >= 30:
-                    stage = "G3b (Disminución Moderada a Severa)"
-                    stage_color = "#FF8C00"
-                    stage_desc = "Considerar referencia a nefrólogo. Evaluación de anemia y salud ósea."
-                elif eGFR >= 15:
-                    stage = "G4 (Disminución Severa)"
-                    stage_color = "#E05D5D"
-                    stage_desc = "Preparación para terapia de reemplazo renal (diálisis/trasplante)."
+                    recommendation = "Función renal normal. Control de factores de riesgo."
+                    egfr_color = "#4CAF50"
+                elif egfr_result >= 60:
+                    stage = "G2 (Ligeramente disminuida)"
+                    recommendation = "Posible ERC. Monitoreo anual y control de comorbilidades."
+                    egfr_color = "#FFC400"
+                elif egfr_result >= 45:
+                    stage = "G3a (Disminución leve a moderada)"
+                    recommendation = "ERC confirmada. Monitoreo frecuente. Evaluar albuminuria."
+                    egfr_color = "#FFA500"
+                elif egfr_result >= 30:
+                    stage = "G3b (Disminución moderada a grave)"
+                    recommendation = "ERC confirmada. Evaluación nefrológica y manejo intensivo."
+                    egfr_color = "#FF8C00"
+                elif egfr_result >= 15:
+                    stage = "G4 (Disminución grave)"
+                    recommendation = "ERC grave. Preparación para terapia de reemplazo renal (diálisis/trasplante)."
+                    egfr_color = "#CE1126"
                 else:
-                    stage = "G5 (Fallo Renal)"
-                    stage_color = "#CE1126"
-                    stage_desc = "Fallo renal establecido. Iniciar terapia de reemplazo renal."
-                    
-                # Mostrar resultados
-                st.markdown("---")
-                col_res_1, col_res_2 = st.columns(2)
-                col_res_1.metric("eGFR Estimada", f"{eGFR:.1f} ml/min/1.73m²")
-                col_res_2.markdown(f"""
-                    <div style='padding: 10px; border: 2px solid #ddd; border-left: 5px solid {stage_color}; border-radius: 4px; background-color: #f9f9f9;'>
-                        <h4 style='color: {stage_color}; margin: 0;'>Etapa K/DOQI: {stage}</h4>
-                        <p style='font-size: 0.9em; margin: 5px 0 0 0;'>{stage_desc}</p>
-                    </div>
-                """, unsafe_allow_html=True)
+                    stage = "G5 (Fallo renal)"
+                    recommendation = "Fallo renal. Inicio urgente de terapia de reemplazo renal."
+                    egfr_color = "#8B0000"
+
                 
-                st.markdown("")
+                col_res1, col_res2 = st.columns(2)
                 
+                with col_res1:
+                    st.markdown(f"""
+                        <div style="border: 2px solid {egfr_color}; padding: 15px; border-radius: 8px; background-color: #f7f7f7; text-align: center;">
+                            <p style="font-size: 1.2em; margin-bottom: 5px; color: #555;">Tasa de Filtración Glomerular Estimada</p>
+                            <h2 style="font-size: 3em; color: {egfr_color}; margin-top: 0; margin-bottom: 10px;">{egfr_result} <span style="font-size: 0.5em;">mL/min/1.73m²</span></h2>
+                        </div>
+                    """, unsafe_allow_html=True)
+                
+                with col_res2:
+                    st.metric("Etapa KDIGO", stage)
+                    st.markdown(f"<p style='color: {egfr_color}; font-weight: bold;'>Recomendación:</p><p>{recommendation}</p>", unsafe_allow_html=True)
+                
+                st.markdown("<p style='font-size: 0.8em; text-align: center; color: #888;'>El eGFR es un estimado y debe ser confirmado con pruebas de laboratorio adicionales.</p>", unsafe_allow_html=True)
+                
+                
+        # Diagrama de estadios
+        st.markdown("---")
+        st.markdown("#### Estadios de la Enfermedad Renal Crónica (KDIGO)")
+        st.markdown("")
+
+
     # =================================================================
     # 7.5 PESTAÑA DE MI HISTORIAL DE ARCHIVOS
     # =================================================================
     with tab_historial:
-        st.markdown("### ⏱️ Mi Historial de Cargas Masivas")
-        st.info("Aquí puedes ver todos los archivos Excel que has subido para predicción masiva.")
+        st.markdown("#### ⏱️ Historial de Archivos Subidos para Carga Masiva")
+        st.info(f"Mostrando los archivos subidos por el usuario **{st.session_state.username}**.")
         
-        history_data = db_store.get_file_history()
+        all_history = db_store.get_file_history()
         user_history = [
-            record for record in history_data 
-            if record.get('user_id') == st.session_state.user_id
+            record for record in all_history if record['user_id'] == st.session_state.user_id
         ]
         
-        if user_history:
-            df_user_history = pd.DataFrame(user_history)
-            df_user_history = df_user_history[['timestamp', 'filename', 'patients']]
-            df_user_history.columns = ['Fecha y Hora', 'Nombre del Archivo', 'Pacientes Procesados']
-            
-            st.dataframe(df_user_history, use_container_width=True)
+        if not user_history:
+            st.warning("Aún no has subido ningún archivo de pacientes para predicción masiva.")
         else:
-            st.info("Aún no has subido ningún archivo para procesamiento masivo.")
+            df_history = pd.DataFrame(user_history)
+            df_history = df_history.rename(columns={
+                'timestamp': 'Fecha/Hora',
+                'filename': 'Nombre del Archivo',
+                'patients': 'Pacientes Procesados',
+                'high_risk_count': 'Riesgo Alto/Muy Alto'
+            })
+            df_history = df_history.drop(columns=['usuario', 'user_id'], errors='ignore')
+            
+            # Ordenar por fecha descendente
+            df_history = df_history.sort_values(by='Fecha/Hora', ascending=False)
+            
+            st.dataframe(df_history, use_container_width=True, hide_index=True)
+
 
 # --- 8. Interfaz del Administrador ---
 
 if st.session_state.user_role == 'admin':
     st.markdown("---")
-    st.markdown("## ⚙️ Panel de Administración")
-    
-    tab_users, tab_global_history = st.tabs(["Gestión de Usuarios", "Historial Global de Cargas"])
+    st.markdown("<h2 style='color:#CE1126;'>🛠️ Panel de Administración del Sistema</h2>", unsafe_allow_html=True)
 
+    tab_users, tab_global_history = st.tabs(["Gestión de Doctores", "Historial Global de Archivos"])
+
+    # =================================================================
+    # 8.1 GESTIÓN DE DOCTORES
+    # =================================================================
     with tab_users:
-        st.markdown("### 👥 Gestión de Doctores")
-        
-        # --- Creación de Nuevo Doctor ---
-        st.markdown("#### Crear Nuevo Doctor")
-        with st.form("new_user_form"):
-            new_username = st.text_input("Nombre de Usuario (único)").lower()
-            new_password = st.text_input("Contraseña Inicial", type="password")
-            create_user_btn = st.form_submit_button("Crear Usuario Doctor")
+        st.markdown("### 👨‍⚕️ Creación y Activación/Desactivación de Cuentas Médicas")
 
-            if create_user_btn:
-                if new_username and new_password:
-                    success, message = create_new_user_db(new_username, new_password, role="doctor")
-                    if success:
-                        st.success(message)
-                    else:
-                        st.error(message)
-                    time.sleep(0.1)
-                    st.rerun() # Recargar para actualizar la lista de usuarios
-                else:
-                    st.warning("Por favor, ingresa nombre de usuario y contraseña.")
+        col_create, col_list = st.columns([1, 2])
 
-        # --- Lista y Activación/Desactivación ---
-        st.markdown("#### Lista de Usuarios Registrados")
-        doctors = get_doctors_db()
-        
-        if doctors:
-            doctors_df = pd.DataFrame(doctors).T
-            doctors_df.index.name = "Username"
-            doctors_df = doctors_df.reset_index()
-            # Ocultar la contraseña para seguridad
-            doctors_df['Estado'] = doctors_df['active'].apply(lambda x: "✅ Activo" if x else "❌ Inactivo")
-            doctors_df = doctors_df[['Username', 'id', 'Estado']]
-            
-            st.dataframe(doctors_df, use_container_width=True)
-            
-            # Funcionalidad para Activar/Desactivar
-            st.markdown("---")
-            st.markdown("#### Cambiar Estado de Cuenta")
-            col_toggle_user, col_toggle_action = st.columns([2, 1])
-            
-            # Obtener lista de usuarios activos para el selectbox
-            doctor_list = list(doctors.keys())
-            if not doctor_list:
-                st.info("No hay doctores registrados para gestionar.")
-            else:
-                user_to_toggle = col_toggle_user.selectbox("Seleccionar Usuario", doctor_list, key="select_user_toggle")
-                current_state = doctors[user_to_toggle].get('active', True)
-                action_label = "Desactivar" if current_state else "Activar"
+        with col_create:
+            st.markdown("#### Crear Nuevo Doctor")
+            with st.form("new_user_form"):
+                new_username = st.text_input("Nombre de Usuario (ej: dr.nuevo)", key="new_user_name").lower()
+                new_password = st.text_input("Contraseña Inicial", type="password", key="new_user_pwd")
                 
-                if col_toggle_action.button(f"{action_label} Cuenta de {user_to_toggle}", key="toggle_user_btn"):
-                    new_state = not current_state
-                    db_store.update_user(user_to_toggle, {"active": new_state})
-                    st.success(f"La cuenta de {user_to_toggle} ha sido **{'ACTIVADA' if new_state else 'DESACTIVADA'}**.")
-                    time.sleep(0.1)
-                    st.rerun()
+                create_submitted = st.form_submit_button("Crear Usuario Doctor")
 
+                if create_submitted:
+                    if new_username and new_password:
+                        success, message = create_new_user_db(new_username, new_password, role="doctor")
+                        if success:
+                            st.success(message)
+                        else:
+                            st.error(message)
+                    else:
+                        st.error("Por favor, ingresa nombre de usuario y contraseña.")
+        
+        with col_list:
+            st.markdown("#### Lista de Cuentas de Doctores")
+            doctors = get_doctors_db()
+            
+            doctor_list = []
+            for name, data in doctors.items():
+                doctor_list.append({
+                    'Usuario': name,
+                    'ID': data['id'],
+                    'Estado': 'ACTIVO' if data.get('active', True) else 'INACTIVO'
+                })
+            
+            df_doctors = pd.DataFrame(doctor_list)
+            st.dataframe(df_doctors, use_container_width=True, hide_index=True)
+            
+            # Formulario para activar/desactivar
+            st.markdown("---")
+            st.markdown("#### Modificar Estado de Cuenta")
+            
+            if not doctors:
+                st.info("No hay doctores para gestionar.")
+            else:
+                doctor_to_modify = st.selectbox("Selecciona Usuario a Modificar:", options=list(doctors.keys()), key="modify_user_select")
+                
+                current_active = doctors[doctor_to_modify].get('active', True)
+                new_status = st.radio(f"Estado actual: {'ACTIVO' if current_active else 'INACTIVO'}", 
+                                      options=[True, False], 
+                                      format_func=lambda x: 'ACTIVAR' if x else 'DESACTIVAR',
+                                      index=0 if current_active else 1)
+                                      
+                modify_submitted = st.button(f"{'Activar' if new_status else 'Desactivar'} {doctor_to_modify}")
+                
+                if modify_submitted:
+                    if db_store.update_user(doctor_to_modify, {'active': new_status}):
+                        st.success(f"Estado de '{doctor_to_modify}' actualizado a {'ACTIVO' if new_status else 'INACTIVO'}.")
+                        time.sleep(0.5)
+                        st.rerun()
+                    else:
+                        st.error("Error al modificar el usuario.")
+
+    # =================================================================
+    # 8.2 HISTORIAL GLOBAL DE ARCHIVOS
+    # =================================================================
     with tab_global_history:
-        st.markdown("### 🌐 Historial Global de Cargas")
-        st.info("Vista de todas las cargas masivas realizadas por todos los doctores en la plataforma.")
+        st.markdown("### 📋 Archivos de Carga Masiva Subidos por Todos los Usuarios")
         
         global_history = get_global_history_db()
         
-        if global_history:
-            df_global_history = pd.DataFrame(global_history)
-            df_global_history = df_global_history[['timestamp', 'usuario', 'filename', 'patients']]
-            df_global_history.columns = ['Fecha y Hora', 'Doctor', 'Nombre del Archivo', 'Pacientes Procesados']
-            
-            st.dataframe(df_global_history, use_container_width=True)
+        if not global_history:
+            st.warning("El historial global de carga masiva está vacío.")
         else:
-            st.info("No hay registros de cargas masivas en la base de datos.")
+            df_global = pd.DataFrame(global_history)
+            df_global = df_global.rename(columns={
+                'timestamp': 'Fecha/Hora',
+                'filename': 'Archivo',
+                'patients': 'Pacientes',
+                'high_risk_count': 'Riesgo Alto/Muy Alto',
+                'usuario': 'Usuario'
+            })
+            
+            df_global = df_global.drop(columns=['user_id'], errors='ignore')
+            df_global = df_global.sort_values(by='Fecha/Hora', ascending=False)
+            
+            st.dataframe(df_global, use_container_width=True, hide_index=True)
