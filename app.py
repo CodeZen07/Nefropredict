@@ -664,7 +664,7 @@ if st.session_state.role == "admin":
             usuarios_data = []
             for user, info in db.data["users"].items():
                 # Contar pacientes de este doctor
-                if info["role"] == "doctor":
+                if info.get("role") == "doctor":
                     num_pacientes = len(db.get_patients_by_doctor(user))
                     num_cargas = len([u for u in db.data.get("uploads", []) if u.get("doctor_user") == user])
                 else:
@@ -673,10 +673,10 @@ if st.session_state.role == "admin":
                 
                 usuarios_data.append({
                     "Usuario": f"@{user}",
-                    "Nombre": info["name"],
-                    "Rol": "👑 Admin" if info["role"] == "admin" else "👨‍⚕️ Doctor",
+                    "Nombre": info.get("name", user),
+                    "Rol": "👑 Admin" if info.get("role") == "admin" else "👨‍⚕️ Doctor",
                     "Estado": "🟢 Activo" if info.get("active", True) else "🔴 Inactivo",
-                    "Contraseña": info["pwd"],
+                    "Contraseña": info.get("pwd", "N/A"),
                     "Pacientes": num_pacientes,
                     "Cargas": num_cargas
                 })
