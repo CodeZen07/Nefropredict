@@ -5,3 +5,4 @@ openpyxl
 joblib
 scikit-learn
 plotly
+bcrypt
