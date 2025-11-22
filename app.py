@@ -560,4 +560,208 @@ with tab3:
         pacientes = db.get_all_patients()
     
     if pacientes:
-        dfp = p
+        dfp = pd.DataFrame(pacientes)
+        
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            st.markdown("#### 🔍 Buscar Paciente")
+            nombres = dfp["nombre_paciente"].unique().tolist()
+            paciente_sel = st.selectbox("Seleccionar paciente", [""] + nombres)
+            
+            # Métricas generales
+            st.markdown("#### 📈 Resumen General")
+            total = len(dfp)
+            prom_riesgo = dfp["riesgo"].mean()
+            alto_riesgo = len(dfp[dfp["riesgo"] > 70])
+            
+            st.metric("Total Evaluaciones", total)
+            st.metric("Riesgo Promedio", f"{prom_riesgo:.1f}%")
+            st.metric("Alto Riesgo (>70%)", alto_riesgo)
+        
+        with col2:
+            if paciente_sel:
+                hist = dfp[dfp["nombre_paciente"] == paciente_sel].sort_values("timestamp")
+                
+                st.markdown(f"#### 📋 Historial de: **{paciente_sel}**")
+                
+                # Último resultado
+                ultimo = hist.iloc[-1]
+                nivel, color, reco = riesgo_level(ultimo["riesgo"])
+                
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Último Riesgo", f"{ultimo['riesgo']:.1f}%")
+                c2.metric("Nivel", nivel)
+                c3.metric("Evaluaciones", len(hist))
+                
+                # Gráfico de evolución temporal
+                if len(hist) > 1:
+                    fig_evol = px.line(
+                        hist, x="timestamp", y="riesgo",
+                        title="📈 Evolución del Riesgo en el Tiempo",
+                        markers=True
+                    )
+                    fig_evol.add_hline(y=70, line_dash="dash", line_color="red", annotation_text="Alto Riesgo")
+                    fig_evol.add_hline(y=40, line_dash="dash", line_color="orange", annotation_text="Riesgo Medio")
+                    fig_evol.update_layout(height=300)
+                    st.plotly_chart(fig_evol, use_container_width=True)
+                
+                # Tabla de historial
+                st.dataframe(
+                    hist[["timestamp", "riesgo", "nivel", "creatinina", "glucosa_ayunas", "presion_sistolica"]],
+                    use_container_width=True,
+                    hide_index=True
+                )
+            else:
+                # Mostrar resumen general si no hay paciente seleccionado
+                st.markdown("#### 📊 Distribución General de Riesgo")
+                
+                # Gráfico de distribución
+                fig_hist = px.histogram(
+                    dfp, x="riesgo", nbins=20,
+                    title="Distribución de Niveles de Riesgo",
+                    color_discrete_sequence=["#002868"]
+                )
+                fig_hist.add_vline(x=70, line_dash="dash", line_color="red")
+                fig_hist.add_vline(x=40, line_dash="dash", line_color="orange")
+                st.plotly_chart(fig_hist, use_container_width=True)
+                
+                # Top pacientes alto riesgo
+                st.markdown("#### ⚠️ Pacientes con Mayor Riesgo")
+                top_riesgo = dfp.nlargest(10, "riesgo")[["nombre_paciente", "riesgo", "nivel", "timestamp"]]
+                st.dataframe(top_riesgo, use_container_width=True, hide_index=True)
+    else:
+        st.info("📭 Aún no hay registros de pacientes")
+
+# =============================================
+# TAB 4: GESTIÓN DE DOCTORES (SOLO ADMIN)
+# =============================================
+if st.session_state.role == "admin":
+    with tab4:
+        st.subheader("👥 Gestión de Doctores")
+        
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            st.markdown("#### ➕ Crear Nuevo Doctor")
+            with st.form("form_nuevo_doctor"):
+                nuevo_user = st.text_input("Usuario (sin espacios)").lower().strip()
+                nuevo_pwd = st.text_input("Contraseña", type="password")
+                nuevo_nombre = st.text_input("Nombre completo")
+                
+                if st.form_submit_button("✅ Crear Doctor", use_container_width=True):
+                    if not nuevo_user or not nuevo_pwd or not nuevo_nombre:
+                        st.error("Todos los campos son obligatorios")
+                    elif db.get_user(nuevo_user):
+                        st.error("El usuario ya existe")
+                    elif " " in nuevo_user:
+                        st.error("El usuario no puede tener espacios")
+                    else:
+                        db.create_doctor(nuevo_user, nuevo_pwd, nuevo_nombre)
+                        st.success(f"✅ Doctor {nuevo_nombre} creado exitosamente")
+                        st.rerun()
+        
+        with col2:
+            st.markdown("#### 📋 Doctores Registrados")
+            
+            doctores = {u: i for u, i in db.data["users"].items() if i["role"] == "doctor"}
+            
+            if doctores:
+                for user, info in doctores.items():
+                    estado = "🟢 Activo" if info["active"] else "🔴 Inactivo"
+                    with st.expander(f"👨‍⚕️ {info['name']} (@{user}) - {estado}"):
+                        c1, c2 = st.columns(2)
+                        
+                        with c1:
+                            nueva_pass = st.text_input("Nueva contraseña", type="password", key=f"pwd_{user}")
+                            if st.button("🔑 Cambiar Contraseña", key=f"btn_pwd_{user}"):
+                                if nueva_pass:
+                                    db.update_password(user, nueva_pass)
+                                    st.success("Contraseña actualizada")
+                                else:
+                                    st.warning("Ingrese una contraseña")
+                        
+                        with c2:
+                            st.write("")  # Espaciado
+                            st.write("")
+                            if st.button("🔄 Activar/Desactivar", key=f"btn_toggle_{user}"):
+                                db.toggle_active(user)
+                                st.rerun()
+                            
+                            if st.button("🗑️ Eliminar", key=f"btn_del_{user}", type="primary"):
+                                db.delete_doctor(user)
+                                st.success(f"Doctor {info['name']} eliminado")
+                                st.rerun()
+            else:
+                st.info("No hay doctores registrados")
+
+    # =============================================
+    # TAB 5: ESTADÍSTICAS ADMIN
+    # =============================================
+    with tab5:
+        st.subheader("📈 Estadísticas del Sistema")
+        
+        all_patients = db.get_all_patients()
+        
+        if all_patients:
+            df_all = pd.DataFrame(all_patients)
+            
+            # Métricas principales
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("📊 Total Evaluaciones", len(df_all))
+            c2.metric("👥 Pacientes Únicos", df_all["nombre_paciente"].nunique())
+            c3.metric("📈 Riesgo Promedio", f"{df_all['riesgo'].mean():.1f}%")
+            c4.metric("⚠️ Alto Riesgo", len(df_all[df_all["riesgo"] > 70]))
+            
+            st.markdown("---")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Evaluaciones por doctor
+                st.markdown("#### 👨‍⚕️ Evaluaciones por Doctor")
+                por_doctor = df_all["doctor_name"].value_counts().reset_index()
+                por_doctor.columns = ["Doctor", "Evaluaciones"]
+                fig_doc = px.bar(por_doctor, x="Doctor", y="Evaluaciones", color="Evaluaciones",
+                                color_continuous_scale="Blues")
+                st.plotly_chart(fig_doc, use_container_width=True)
+            
+            with col2:
+                # Distribución de riesgo
+                st.markdown("#### 📊 Distribución de Riesgo")
+                df_all["categoria"] = df_all["riesgo"].apply(
+                    lambda x: "Alto (>70%)" if x > 70 else "Medio (40-70%)" if x > 40 else "Bajo (<40%)"
+                )
+                por_cat = df_all["categoria"].value_counts().reset_index()
+                por_cat.columns = ["Categoría", "Cantidad"]
+                fig_cat = px.pie(por_cat, values="Cantidad", names="Categoría",
+                                color_discrete_sequence=["#CE1126", "#FFC400", "#4CAF50"])
+                st.plotly_chart(fig_cat, use_container_width=True)
+            
+            # Tendencia temporal
+            st.markdown("#### 📅 Tendencia de Evaluaciones")
+            df_all["fecha"] = pd.to_datetime(df_all["timestamp"]).dt.date
+            por_fecha = df_all.groupby("fecha").agg({"riesgo": ["count", "mean"]}).reset_index()
+            por_fecha.columns = ["Fecha", "Cantidad", "Riesgo Promedio"]
+            
+            fig_trend = px.line(por_fecha, x="Fecha", y="Cantidad", 
+                               title="Evaluaciones por Día", markers=True)
+            st.plotly_chart(fig_trend, use_container_width=True)
+            
+            # Tabla resumen por doctor
+            st.markdown("#### 📋 Resumen por Doctor")
+            resumen = df_all.groupby("doctor_name").agg({
+                "nombre_paciente": "count",
+                "riesgo": "mean"
+            }).reset_index()
+            resumen.columns = ["Doctor", "Total Evaluaciones", "Riesgo Promedio"]
+            resumen["Riesgo Promedio"] = resumen["Riesgo Promedio"].round(1)
+            st.dataframe(resumen, use_container_width=True, hide_index=True)
+        else:
+            st.info("📭 Aún no hay datos para mostrar estadísticas")
+
+# =============================================
+# FOOTER
+# =============================================
+st.markdown("---")
+st.caption("🩺 NefroPredict RD © 2025 • Sistema de Detección Temprana de ERC • República Dominicana")
