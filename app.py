@@ -11,9 +11,9 @@ import plotly.graph_objects as go
 from io import BytesIO
 
 # =============================================
-# CONFIGURACIÓN Y ESTILOS
+# CONFIGURACIÃ“N Y ESTILOS
 # =============================================
-st.set_page_config(page_title="NefroPredict RD", page_icon="🩺", layout="wide")
+st.set_page_config(page_title="NefroPredict RD", page_icon="ðŸ©º", layout="wide")
 
 st.markdown("""
 <style>
@@ -34,8 +34,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1 style='text-align:center;'>🩺 NefroPredict RD 2025</h1>", unsafe_allow_html=True)
-st.markdown("<h4 style='text-align:center;color:#555;'>Detección temprana de ERC • República Dominicana</h4>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align:center;'>ðŸ©º NefroPredict RD 2025</h1>", unsafe_allow_html=True)
+st.markdown("<h4 style='text-align:center;color:#555;'>DetecciÃ³n temprana de ERC â€¢ RepÃºblica Dominicana</h4>", unsafe_allow_html=True)
 
 # =============================================
 # BASE DE DATOS
@@ -52,8 +52,8 @@ class DataStore:
         initial = {
             "users": {
                 "admin": {"pwd": "admin", "role": "admin", "name": "Administrador", "active": True},
-                "dr.perez": {"pwd": "1234", "role": "doctor", "name": "Dr. José Pérez", "active": True},
-                "dr.gomez": {"pwd": "1234", "role": "doctor", "name": "Dra. Ana Gómez", "active": True}
+                "dr.perez": {"pwd": "1234", "role": "doctor", "name": "Dr. JosÃ© PÃ©rez", "active": True},
+                "dr.gomez": {"pwd": "1234", "role": "doctor", "name": "Dra. Ana GÃ³mez", "active": True}
             },
             "patients": [],
             "uploads": []
@@ -135,15 +135,15 @@ def load_model():
 model = load_model()
 
 # =============================================
-# FUNCIONES DE RIESGO Y PREDICCIÓN
+# FUNCIONES DE RIESGO Y PREDICCIÃ“N
 # =============================================
 def riesgo_level(risk):
     if risk > 70:
-        return "MUY ALTO", "#CE1126", "Intervención URGENTE - Referir a nefrología"
+        return "MUY ALTO", "#CE1126", "IntervenciÃ³n URGENTE - Referir a nefrologÃ­a"
     elif risk > 40:
-        return "ALTO", "#FFC400", "Intervención Media - Control estricto"
+        return "ALTO", "#FFC400", "IntervenciÃ³n Media - Control estricto"
     else:
-        return "MODERADO", "#4CAF50", "Seguimiento Rutinario - Control periódico"
+        return "MODERADO", "#4CAF50", "Seguimiento Rutinario - Control periÃ³dico"
 
 def predecir(row):
     feats = np.array([[row["edad"], row["imc"], row["presion_sistolica"],
@@ -151,7 +151,7 @@ def predecir(row):
     if model:
         return round(model.predict_proba(feats)[0][1] * 100, 1)
     else:
-        # Simulación realista basada en factores de riesgo
+        # SimulaciÃ³n realista basada en factores de riesgo
         base = 10
         base += (row["creatinina"] - 1) * 32
         base += max(0, row["glucosa_ayunas"] - 126) * 0.3
@@ -161,7 +161,7 @@ def predecir(row):
         return round(max(1, min(99, base + np.random.uniform(-5, 8))), 1)
 
 def crear_gauge_riesgo(riesgo):
-    """Crear gráfico de velocímetro para el riesgo"""
+    """Crear grÃ¡fico de velocÃ­metro para el riesgo"""
     if riesgo > 70:
         color = "#CE1126"
     elif riesgo > 40:
@@ -196,12 +196,12 @@ def crear_gauge_riesgo(riesgo):
     return fig
 
 def crear_grafico_factores(paciente):
-    """Crear gráfico de barras con los factores de riesgo"""
-    # Normalizar valores para comparación
+    """Crear grÃ¡fico de barras con los factores de riesgo"""
+    # Normalizar valores para comparaciÃ³n
     factores = {
         'Edad': min(100, (paciente['edad'] / 100) * 100),
         'IMC': min(100, (paciente['imc'] / 40) * 100),
-        'Presión': min(100, (paciente['presion_sistolica'] / 200) * 100),
+        'PresiÃ³n': min(100, (paciente['presion_sistolica'] / 200) * 100),
         'Glucosa': min(100, (paciente['glucosa_ayunas'] / 300) * 100),
         'Creatinina': min(100, (paciente['creatinina'] / 5) * 100)
     }
@@ -231,7 +231,7 @@ def crear_grafico_factores(paciente):
     return fig
 
 def generar_reporte_html(paciente, riesgo, nivel, doctor):
-    """Generar reporte HTML para impresión/PDF"""
+    """Generar reporte HTML para impresiÃ³n/PDF"""
     fecha = datetime.now().strftime("%d/%m/%Y %H:%M")
     color = '#CE1126' if riesgo > 70 else '#FFC400' if riesgo > 40 else '#4CAF50'
     
@@ -271,8 +271,8 @@ def generar_reporte_html(paciente, riesgo, nivel, doctor):
 <body>
     <div class="container">
         <div class="header">
-            <h1>🩺 NefroPredict RD</h1>
-            <p>Sistema de Detección Temprana de Enfermedad Renal Crónica</p>
+            <h1>ðŸ©º NefroPredict RD</h1>
+            <p>Sistema de DetecciÃ³n Temprana de Enfermedad Renal CrÃ³nica</p>
         </div>
         <div class="content">
             <div class="info-grid">
@@ -281,15 +281,15 @@ def generar_reporte_html(paciente, riesgo, nivel, doctor):
                     <div class="info-value">{paciente['nombre_paciente']}</div>
                 </div>
                 <div class="info-item">
-                    <div class="info-label">Médico Tratante</div>
+                    <div class="info-label">MÃ©dico Tratante</div>
                     <div class="info-value">{doctor}</div>
                 </div>
                 <div class="info-item">
-                    <div class="info-label">Fecha de Evaluación</div>
+                    <div class="info-label">Fecha de EvaluaciÃ³n</div>
                     <div class="info-value">{fecha}</div>
                 </div>
                 <div class="info-item">
-                    <div class="info-label">ID Evaluación</div>
+                    <div class="info-label">ID EvaluaciÃ³n</div>
                     <div class="info-value">#{datetime.now().strftime('%Y%m%d%H%M')}</div>
                 </div>
             </div>
@@ -299,24 +299,24 @@ def generar_reporte_html(paciente, riesgo, nivel, doctor):
                 <div class="risk-label">Riesgo {nivel}</div>
             </div>
             
-            <h3 style="color: #002868; margin: 20px 0 10px;">Parámetros Clínicos</h3>
+            <h3 style="color: #002868; margin: 20px 0 10px;">ParÃ¡metros ClÃ­nicos</h3>
             <table class="params-table">
-                <tr><th>Parámetro</th><th>Valor</th><th>Rango Normal</th></tr>
-                <tr><td>Edad</td><td>{paciente['edad']} años</td><td>-</td></tr>
-                <tr><td>Índice de Masa Corporal</td><td>{paciente['imc']:.1f} kg/m²</td><td>18.5 - 24.9</td></tr>
-                <tr><td>Presión Sistólica</td><td>{paciente['presion_sistolica']} mmHg</td><td>90 - 120</td></tr>
+                <tr><th>ParÃ¡metro</th><th>Valor</th><th>Rango Normal</th></tr>
+                <tr><td>Edad</td><td>{paciente['edad']} aÃ±os</td><td>-</td></tr>
+                <tr><td>Ãndice de Masa Corporal</td><td>{paciente['imc']:.1f} kg/mÂ²</td><td>18.5 - 24.9</td></tr>
+                <tr><td>PresiÃ³n SistÃ³lica</td><td>{paciente['presion_sistolica']} mmHg</td><td>90 - 120</td></tr>
                 <tr><td>Glucosa en Ayunas</td><td>{paciente['glucosa_ayunas']} mg/dL</td><td>70 - 100</td></tr>
-                <tr><td>Creatinina Sérica</td><td>{paciente['creatinina']:.2f} mg/dL</td><td>0.7 - 1.3</td></tr>
+                <tr><td>Creatinina SÃ©rica</td><td>{paciente['creatinina']:.2f} mg/dL</td><td>0.7 - 1.3</td></tr>
             </table>
             
             <div class="recommendation">
-                <h3 style="color: {color}; margin-bottom: 10px;">📋 Recomendación Clínica</h3>
+                <h3 style="color: {color}; margin-bottom: 10px;">ðŸ“‹ RecomendaciÃ³n ClÃ­nica</h3>
                 <p style="font-size: 1.1em;">{riesgo_level(riesgo)[2]}</p>
             </div>
         </div>
         <div class="footer">
-            <p>NefroPredict RD © 2025 • República Dominicana</p>
-            <p>Este reporte es una herramienta de apoyo diagnóstico y no reemplaza el criterio médico.</p>
+            <p>NefroPredict RD Â© 2025 â€¢ RepÃºblica Dominicana</p>
+            <p>Este reporte es una herramienta de apoyo diagnÃ³stico y no reemplaza el criterio mÃ©dico.</p>
         </div>
     </div>
     <script>window.onload = function() {{ window.print(); }}</script>
@@ -334,32 +334,29 @@ if not st.session_state.logged_in:
     st.markdown("---")
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown("### 🔐 Iniciar Sesión")
+        st.markdown("### ðŸ” Iniciar SesiÃ³n")
         with st.form("login_form"):
             username = st.text_input("Usuario").lower().strip()
-            password = st.text_input("Contraseña", type="password")
+            password = st.text_input("ContraseÃ±a", type="password")
             submitted = st.form_submit_button("Entrar", use_container_width=True)
             if submitted:
-                user = db.verify_login(username, password)
-                if user:
+                user = db.get_user(username)
+                if user and user["pwd"] == password and user.get("active", True):
                     st.session_state.logged_in = True
                     st.session_state.username = username
-                    st.session_state.role = user.get("role", "doctor")
+                    st.session_state.role = user["role"]
                     st.session_state.doctor_name = user.get("name", username)
                     st.rerun()
                 else:
-                    st.error("❌ Usuario o contraseña incorrectos, o cuenta inactiva")
-        
-        st.markdown("---")
-        st.markdown("<p style='text-align:center; color:#666; font-size:0.8em;'>🔒 Conexión segura • Contraseñas encriptadas</p>", unsafe_allow_html=True)
+                    st.error("âŒ Usuario o contraseÃ±a incorrectos")
     st.stop()
 
 # Barra superior con info de usuario
 col1, col2 = st.columns([5, 1])
 with col1:
-    st.success(f"👨‍⚕️ **{st.session_state.doctor_name}** • @{st.session_state.username}")
+    st.success(f"ðŸ‘¨â€âš•ï¸ **{st.session_state.doctor_name}** â€¢ @{st.session_state.username}")
 with col2:
-    if st.button("🚪 Salir"):
+    if st.button("ðŸšª Salir"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
@@ -367,50 +364,44 @@ with col2:
 st.markdown("---")
 
 # =============================================
-# PESTAÑAS SEGÚN ROL
+# PESTAÃ‘AS SEGÃšN ROL
 # =============================================
 if st.session_state.role == "admin":
-    tabs = st.tabs(["📋 Evaluación Individual", "📤 Carga Masiva", "📊 Historial", "👥 Gestión Doctores", "📈 Estadísticas"])
+    tabs = st.tabs(["ðŸ“‹ EvaluaciÃ³n Individual", "ðŸ“¤ Carga Masiva", "ðŸ“Š Historial", "ðŸ‘¥ GestiÃ³n Doctores", "ðŸ“ˆ EstadÃ­sticas"])
     tab1, tab2, tab3, tab4, tab5 = tabs
 else:
-    tabs = st.tabs(["📋 Evaluación Individual", "📤 Carga Masiva", "📊 Historial"])
+    tabs = st.tabs(["ðŸ“‹ EvaluaciÃ³n Individual", "ðŸ“¤ Carga Masiva", "ðŸ“Š Historial"])
     tab1, tab2, tab3 = tabs
 
 # =============================================
-# TAB 1: EVALUACIÓN INDIVIDUAL
+# TAB 1: EVALUACIÃ“N INDIVIDUAL
 # =============================================
 with tab1:
-    st.subheader("📋 Evaluación Individual de Paciente")
+    st.subheader("ðŸ“‹ EvaluaciÃ³n Individual de Paciente")
     
     col_form, col_result = st.columns([1, 1])
     
     with col_form:
         st.markdown("#### Datos del Paciente")
         with st.form("form_individual", clear_on_submit=False):
-            nombre = st.text_input("👤 Nombre completo del paciente", placeholder="Ej: Juan Pérez García")
+            nombre = st.text_input("ðŸ‘¤ Nombre completo del paciente", placeholder="Ej: Juan PÃ©rez GarcÃ­a")
             
-            st.markdown("##### Datos Demográficos")
+            st.markdown("##### Datos ClÃ­nicos")
             c1, c2 = st.columns(2)
             with c1:
-                edad = st.number_input("📅 Edad (años)", 18, 120, 55)
-                sexo = st.selectbox("⚧ Sexo biológico", ["Masculino", "Femenino"])
+                edad = st.number_input("ðŸ“… Edad (aÃ±os)", 18, 120, 55)
+                imc = st.number_input("âš–ï¸ IMC (kg/mÂ²)", 10.0, 60.0, 27.0, 0.1)
+                glucosa = st.number_input("ðŸ©¸ Glucosa ayunas (mg/dL)", 50, 500, 110)
             with c2:
-                imc = st.number_input("⚖️ IMC (kg/m²)", 10.0, 60.0, 27.0, 0.1)
+                presion = st.number_input("ðŸ’“ PresiÃ³n sistÃ³lica (mmHg)", 80, 250, 130)
+                creatinina = st.number_input("ðŸ§ª Creatinina (mg/dL)", 0.1, 15.0, 1.2, 0.01)
             
-            st.markdown("##### Datos Clínicos")
-            c3, c4 = st.columns(2)
-            with c3:
-                glucosa = st.number_input("🩸 Glucosa ayunas (mg/dL)", 50, 500, 110)
-                presion = st.number_input("💓 Presión sistólica (mmHg)", 80, 250, 130)
-            with c4:
-                creatinina = st.number_input("🧪 Creatinina (mg/dL)", 0.1, 15.0, 1.2, 0.01)
-            
-            calcular = st.form_submit_button("🔬 Calcular Riesgo y TFG", use_container_width=True)
+            calcular = st.form_submit_button("ðŸ”¬ Calcular Riesgo", use_container_width=True)
     
     with col_result:
         if calcular:
             if not nombre.strip():
-                st.error("⚠️ El nombre del paciente es obligatorio")
+                st.error("âš ï¸ El nombre del paciente es obligatorio")
             else:
                 # Calcular riesgo
                 datos_paciente = {
@@ -420,24 +411,17 @@ with tab1:
                 riesgo = predecir(datos_paciente)
                 nivel, color, recomendacion = riesgo_level(riesgo)
                 
-                # Calcular TFG y Estadio ERC
-                sexo_code = "F" if sexo == "Femenino" else "M"
-                tfg = calcular_tfg(creatinina, edad, sexo_code)
-                estadio, desc_estadio, color_estadio, reco_estadio = clasificar_estadio_erc(tfg)
-                
                 # Guardar en base de datos
                 record = {
                     "nombre_paciente": nombre,
                     "doctor_user": st.session_state.username,
                     "doctor_name": st.session_state.doctor_name,
                     "timestamp": datetime.now().isoformat(),
-                    "edad": edad, "sexo": sexo, "imc": imc, "presion_sistolica": presion,
+                    "edad": edad, "imc": imc, "presion_sistolica": presion,
                     "glucosa_ayunas": glucosa, "creatinina": creatinina,
-                    "riesgo": riesgo, "nivel": nivel,
-                    "tfg": tfg, "estadio_erc": estadio
+                    "riesgo": riesgo, "nivel": nivel
                 }
                 db.add_patient(record)
-                db.log_audit(st.session_state.username, f"Evaluó paciente: {nombre} - Riesgo: {riesgo}%, TFG: {tfg}, Estadio: {estadio}", "EVALUATION")
                 
                 # Guardar en session_state para mostrar
                 st.session_state.ultimo_resultado = record
@@ -447,60 +431,38 @@ with tab1:
             p = st.session_state.ultimo_resultado
             nivel, color, recomendacion = riesgo_level(p["riesgo"])
             
-            # Obtener TFG y estadio (con valores por defecto si no existen)
-            tfg = p.get("tfg", calcular_tfg(p["creatinina"], p["edad"], "M"))
-            estadio = p.get("estadio_erc", clasificar_estadio_erc(tfg)[0])
-            estadio_info = clasificar_estadio_erc(tfg)
+            st.markdown("#### ðŸ“Š Resultado del AnÃ¡lisis")
             
-            st.markdown("#### 📊 Resultado del Análisis")
-            
-            # Métricas principales en tarjetas
-            m1, m2 = st.columns(2)
-            with m1:
-                st.metric("🎯 Riesgo ERC", f"{p['riesgo']:.1f}%", nivel)
-            with m2:
-                st.metric("🧪 TFG (mL/min/1.73m²)", f"{tfg:.1f}", f"Estadio {estadio}")
-            
-            # Gráfico de gauge
+            # GrÃ¡fico de gauge
             st.plotly_chart(crear_gauge_riesgo(p["riesgo"]), use_container_width=True)
             
-            # Tarjeta de Estadio ERC
-            st.markdown(f"""
-            <div class="erc-stage {get_estadio_clase_css(estadio)}" style="margin: 15px 0;">
-                <h3 style="margin:0;">📋 Estadio ERC: {estadio}</h3>
-                <p style="margin:5px 0; font-size:1.1em;">{estadio_info[1]}</p>
-                <p style="margin:5px 0;"><strong>TFG:</strong> {tfg:.1f} mL/min/1.73m²</p>
-                <p style="margin:5px 0;"><strong>Recomendación:</strong> {estadio_info[3]}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Tarjeta de resultado de riesgo
+            # Tarjeta de resultado
             if p["riesgo"] > 70:
                 st.markdown(f"""<div class="risk-high">
-                    <h2>⚠️ RIESGO {nivel}</h2>
+                    <h2>âš ï¸ RIESGO {nivel}</h2>
                     <h1 style="font-size:3em">{p["riesgo"]:.1f}%</h1>
                     <p>{recomendacion}</p>
                 </div>""", unsafe_allow_html=True)
             elif p["riesgo"] > 40:
                 st.markdown(f"""<div class="risk-med">
-                    <h2>⚡ RIESGO {nivel}</h2>
+                    <h2>âš¡ RIESGO {nivel}</h2>
                     <h1 style="font-size:3em">{p["riesgo"]:.1f}%</h1>
                     <p>{recomendacion}</p>
                 </div>""", unsafe_allow_html=True)
             else:
                 st.markdown(f"""<div class="risk-low">
-                    <h2>✅ RIESGO {nivel}</h2>
+                    <h2>âœ… RIESGO {nivel}</h2>
                     <h1 style="font-size:3em">{p["riesgo"]:.1f}%</h1>
                     <p>{recomendacion}</p>
                 </div>""", unsafe_allow_html=True)
             
-            # Gráfico de factores
+            # GrÃ¡fico de factores
             st.plotly_chart(crear_grafico_factores(p), use_container_width=True)
             
-            # Botón para descargar/imprimir reporte
+            # BotÃ³n para descargar/imprimir reporte
             reporte_html = generar_reporte_html(p, p["riesgo"], nivel, st.session_state.doctor_name)
             st.download_button(
-                "🖨️ Descargar/Imprimir Reporte",
+                "ðŸ–¨ï¸ Descargar/Imprimir Reporte",
                 reporte_html,
                 file_name=f"Reporte_{p['nombre_paciente'].replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.html",
                 mime="text/html",
@@ -511,15 +473,14 @@ with tab1:
 # TAB 2: CARGA MASIVA
 # =============================================
 with tab2:
-    st.subheader("📤 Carga Masiva desde Excel/CSV")
+    st.subheader("ðŸ“¤ Carga Masiva desde Excel/CSV")
     
     col1, col2 = st.columns([1, 3])
     
     with col1:
-        st.markdown("#### 📥 Descargar Plantilla")
+        st.markdown("#### ðŸ“¥ Descargar Plantilla")
         plantilla = pd.DataFrame({
-            "nombre_paciente": ["Juan Pérez", "María López", "Carlos Rodríguez"],
-            "sexo": ["M", "F", "M"],
+            "nombre_paciente": ["Juan PÃ©rez", "MarÃ­a LÃ³pez", "Carlos RodrÃ­guez"],
             "edad": [60, 55, 72],
             "imc": [29.5, 31.2, 26.8],
             "presion_sistolica": [150, 140, 165],
@@ -527,14 +488,14 @@ with tab2:
             "creatinina": [1.8, 1.1, 2.3]
         })
         csv = plantilla.to_csv(index=False).encode('utf-8')
-        st.download_button("⬇️ Descargar Plantilla CSV", csv, "plantilla_nefropredict.csv", "text/csv", use_container_width=True)
+        st.download_button("â¬‡ï¸ Descargar Plantilla CSV", csv, "plantilla_nefropredict.csv", "text/csv", use_container_width=True)
         
         st.markdown("---")
-        st.markdown("#### 📤 Subir Archivo")
+        st.markdown("#### ðŸ“¤ Subir Archivo")
         uploaded_file = st.file_uploader("Seleccionar archivo", type=["csv", "xlsx"])
         
         st.markdown("---")
-        st.info("💡 **Tip:** No es obligatorio tener todas las columnas. Los campos vacíos se marcarán. Incluye 'sexo' (M/F) para cálculo preciso de TFG.")
+        st.info("ðŸ’¡ **Tip:** No es obligatorio tener todas las columnas. Los campos vacÃ­os se marcarÃ¡n en rojo.")
     
     with col2:
         if uploaded_file:
@@ -544,7 +505,6 @@ with tab2:
                 # Columnas esperadas con valores por defecto
                 columnas_default = {
                     "nombre_paciente": "Sin nombre",
-                    "sexo": "M",
                     "edad": 50,
                     "imc": 25.0,
                     "presion_sistolica": 120,
@@ -559,11 +519,11 @@ with tab2:
                         df[col] = default
                         campos_faltantes.append(col)
                 
-                # Marcar valores vacíos/nulos
+                # Marcar valores vacÃ­os/nulos
                 df["campos_vacios"] = ""
                 for col in columnas_default.keys():
                     if col in df.columns:
-                        # Detectar valores vacíos
+                        # Detectar valores vacÃ­os
                         mask = df[col].isna() | (df[col].astype(str).str.strip() == "")
                         if mask.any():
                             df.loc[mask, col] = columnas_default[col]
@@ -572,27 +532,17 @@ with tab2:
                 df["campos_vacios"] = df["campos_vacios"].str.rstrip(", ")
                 
                 if campos_faltantes:
-                    st.warning(f"⚠️ Columnas no encontradas (se usaron valores por defecto): {', '.join(campos_faltantes)}")
+                    st.warning(f"âš ï¸ Columnas no encontradas (se usaron valores por defecto): {', '.join(campos_faltantes)}")
                 
-                # Calcular riesgo, TFG y estadio para todos
+                # Calcular riesgo para todos
                 df["riesgo"] = df.apply(predecir, axis=1)
                 df["nivel"] = df["riesgo"].apply(lambda x: riesgo_level(x)[0])
                 df["color"] = df["riesgo"].apply(lambda x: riesgo_level(x)[1])
                 df["recomendacion"] = df["riesgo"].apply(lambda x: riesgo_level(x)[2])
                 
-                # Calcular TFG y Estadio ERC
-                def calc_tfg_row(row):
-                    sexo = str(row.get("sexo", "M")).upper()
-                    sexo_code = "F" if sexo in ["F", "FEMENINO", "MUJER"] else "M"
-                    return calcular_tfg(row["creatinina"], row["edad"], sexo_code)
-                
-                df["tfg"] = df.apply(calc_tfg_row, axis=1)
-                df["estadio_erc"] = df["tfg"].apply(lambda x: clasificar_estadio_erc(x)[0])
-                df["desc_estadio"] = df["tfg"].apply(lambda x: clasificar_estadio_erc(x)[1])
-                
                 # Clasificar pacientes
                 df["categoria"] = df["riesgo"].apply(
-                    lambda x: "🔴 Crítico" if x > 70 else "🟡 Medio" if x > 40 else "🟢 Normal"
+                    lambda x: "ðŸ”´ CrÃ­tico" if x > 70 else "ðŸŸ¡ Medio" if x > 40 else "ðŸŸ¢ Normal"
                 )
                 
                 # Guardar en BD
@@ -602,34 +552,31 @@ with tab2:
                         "doctor_user": st.session_state.username,
                         "doctor_name": st.session_state.doctor_name,
                         "timestamp": datetime.now().isoformat(),
-                        "sexo": str(r.get("sexo", "M")),
                         "edad": int(r["edad"]), "imc": float(r["imc"]),
                         "presion_sistolica": int(r["presion_sistolica"]),
                         "glucosa_ayunas": int(r["glucosa_ayunas"]),
                         "creatinina": float(r["creatinina"]),
                         "riesgo": float(r["riesgo"]), "nivel": r["nivel"],
-                        "tfg": float(r["tfg"]), "estadio_erc": r["estadio_erc"],
                         "campos_vacios": r["campos_vacios"]
                     })
                 
-                # Log de carga y auditoría
+                # Log de carga
                 db.add_upload_log({
                     "doctor_user": st.session_state.username,
                     "doctor_name": st.session_state.doctor_name,
                     "timestamp": datetime.now().isoformat(),
                     "cantidad": len(df)
                 })
-                db.log_audit(st.session_state.username, f"Carga masiva: {len(df)} pacientes procesados", "BULK_UPLOAD")
                 
-                # Conteos por categoría
+                # Conteos por categorÃ­a
                 criticos = df[df["riesgo"] > 70]
                 medios = df[(df["riesgo"] > 40) & (df["riesgo"] <= 70)]
                 normales = df[df["riesgo"] <= 40]
                 
-                st.success(f"✅ **{len(df)} pacientes procesados exitosamente**")
+                st.success(f"âœ… **{len(df)} pacientes procesados exitosamente**")
                 
                 # ========== TARJETAS DE RESUMEN ==========
-                st.markdown("### 📊 Resumen de Resultados")
+                st.markdown("### ðŸ“Š Resumen de Resultados")
                 
                 c1, c2, c3 = st.columns(3)
                 
@@ -637,9 +584,9 @@ with tab2:
                     st.markdown(f"""
                     <div style="background: linear-gradient(135deg, #dc3545, #c82333); padding:25px; border-radius:15px; text-align:center; color:white; box-shadow: 0 4px 15px rgba(220,53,69,0.4);">
                         <h1 style="margin:0; font-size:3.5em; color:white !important;">{len(criticos)}</h1>
-                        <h3 style="margin:5px 0; color:white !important;">🔴 CRÍTICOS</h3>
+                        <h3 style="margin:5px 0; color:white !important;">ðŸ”´ CRÃTICOS</h3>
                         <p style="margin:0; color:#ffcccc;">Riesgo > 70%</p>
-                        <p style="margin:5px 0; font-weight:bold; color:white !important;">Intervención URGENTE</p>
+                        <p style="margin:5px 0; font-weight:bold; color:white !important;">IntervenciÃ³n URGENTE</p>
                     </div>
                     """, unsafe_allow_html=True)
                 
@@ -647,7 +594,7 @@ with tab2:
                     st.markdown(f"""
                     <div style="background: linear-gradient(135deg, #fd7e14, #e76f00); padding:25px; border-radius:15px; text-align:center; color:white; box-shadow: 0 4px 15px rgba(253,126,20,0.4);">
                         <h1 style="margin:0; font-size:3.5em; color:white !important;">{len(medios)}</h1>
-                        <h3 style="margin:5px 0; color:white !important;">🟡 RIESGO MEDIO</h3>
+                        <h3 style="margin:5px 0; color:white !important;">ðŸŸ¡ RIESGO MEDIO</h3>
                         <p style="margin:0; color:#fff3cd;">Riesgo 40-70%</p>
                         <p style="margin:5px 0; font-weight:bold; color:white !important;">Control Estricto</p>
                     </div>
@@ -657,7 +604,7 @@ with tab2:
                     st.markdown(f"""
                     <div style="background: linear-gradient(135deg, #28a745, #1e7e34); padding:25px; border-radius:15px; text-align:center; color:white; box-shadow: 0 4px 15px rgba(40,167,69,0.4);">
                         <h1 style="margin:0; font-size:3.5em; color:white !important;">{len(normales)}</h1>
-                        <h3 style="margin:5px 0; color:white !important;">🟢 NORMALES</h3>
+                        <h3 style="margin:5px 0; color:white !important;">ðŸŸ¢ NORMALES</h3>
                         <p style="margin:0; color:#d4edda;">Riesgo < 40%</p>
                         <p style="margin:5px 0; font-weight:bold; color:white !important;">Seguimiento Rutinario</p>
                     </div>
@@ -665,18 +612,18 @@ with tab2:
                 
                 st.markdown("---")
                 
-                # ========== GRÁFICOS ==========
-                st.markdown("### 📈 Visualización General")
+                # ========== GRÃFICOS ==========
+                st.markdown("### ðŸ“ˆ VisualizaciÃ³n General")
                 
                 graf_col1, graf_col2 = st.columns(2)
                 
                 with graf_col1:
-                    # Gráfico de pastel
+                    # GrÃ¡fico de pastel
                     fig_pie = px.pie(
                         values=[len(criticos), len(medios), len(normales)],
-                        names=['🔴 Críticos (>70%)', '🟡 Medio (40-70%)', '🟢 Normal (<40%)'],
+                        names=['ðŸ”´ CrÃ­ticos (>70%)', 'ðŸŸ¡ Medio (40-70%)', 'ðŸŸ¢ Normal (<40%)'],
                         color_discrete_sequence=['#CE1126', '#FFC400', '#4CAF50'],
-                        title="📊 Distribución por Nivel de Riesgo",
+                        title="ðŸ“Š DistribuciÃ³n por Nivel de Riesgo",
                         hole=0.4
                     )
                     fig_pie.update_traces(textposition='inside', textinfo='percent+value')
@@ -684,7 +631,7 @@ with tab2:
                     st.plotly_chart(fig_pie, use_container_width=True)
                 
                 with graf_col2:
-                    # Gráfico de barras horizontal por paciente
+                    # GrÃ¡fico de barras horizontal por paciente
                     df_sorted = df.sort_values("riesgo", ascending=True).tail(15)
                     fig_bar = px.bar(
                         df_sorted,
@@ -693,56 +640,48 @@ with tab2:
                         orientation='h',
                         color="riesgo",
                         color_continuous_scale=["#4CAF50", "#FFC400", "#CE1126"],
-                        title="📊 Top 15 Pacientes por Riesgo",
+                        title="ðŸ“Š Top 15 Pacientes por Riesgo",
                         text="riesgo"
                     )
                     fig_bar.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
                     fig_bar.update_layout(height=400, showlegend=False)
-                    fig_bar.add_vline(x=70, line_dash="dash", line_color="red", annotation_text="Crítico")
+                    fig_bar.add_vline(x=70, line_dash="dash", line_color="red", annotation_text="CrÃ­tico")
                     fig_bar.add_vline(x=40, line_dash="dash", line_color="orange", annotation_text="Medio")
                     st.plotly_chart(fig_bar, use_container_width=True)
                 
                 st.markdown("---")
                 
-                # ========== FILTRO POR CATEGORÍA ==========
-                st.markdown("### 🔍 Ver Pacientes por Categoría")
+                # ========== FILTRO POR CATEGORÃA ==========
+                st.markdown("### ðŸ” Ver Pacientes por CategorÃ­a")
                 
                 filtro_cat = st.radio(
-                    "Seleccionar categoría:",
-                    ["📋 Todos", "🔴 Críticos", "🟡 Riesgo Medio", "🟢 Normales"],
+                    "Seleccionar categorÃ­a:",
+                    ["ðŸ“‹ Todos", "ðŸ”´ CrÃ­ticos", "ðŸŸ¡ Riesgo Medio", "ðŸŸ¢ Normales"],
                     horizontal=True
                 )
                 
-                if filtro_cat == "🔴 Críticos":
+                if filtro_cat == "ðŸ”´ CrÃ­ticos":
                     df_mostrar = criticos.copy()
-                elif filtro_cat == "🟡 Riesgo Medio":
+                elif filtro_cat == "ðŸŸ¡ Riesgo Medio":
                     df_mostrar = medios.copy()
-                elif filtro_cat == "🟢 Normales":
+                elif filtro_cat == "ðŸŸ¢ Normales":
                     df_mostrar = normales.copy()
                 else:
                     df_mostrar = df.copy()
                 
                 if len(df_mostrar) > 0:
                     # Preparar dataframe para mostrar
-                    columnas_mostrar = ["nombre_paciente", "sexo", "edad", "imc", "presion_sistolica", 
-                                       "glucosa_ayunas", "creatinina", "tfg", "estadio_erc", "riesgo", "nivel"]
+                    columnas_mostrar = ["nombre_paciente", "edad", "imc", "presion_sistolica", 
+                                       "glucosa_ayunas", "creatinina", "riesgo", "nivel"]
                     columnas_disponibles = [c for c in columnas_mostrar if c in df_mostrar.columns]
                     
                     df_display = df_mostrar[columnas_disponibles].copy()
-                    
-                    # Renombrar columnas
-                    rename_cols = {
-                        "nombre_paciente": "Paciente", "sexo": "Sexo", "edad": "Edad", 
-                        "imc": "IMC", "presion_sistolica": "P.Sist.", "glucosa_ayunas": "Glucosa",
-                        "creatinina": "Creat.", "tfg": "TFG", "estadio_erc": "Estadio",
-                        "riesgo": "Riesgo %", "nivel": "Nivel"
-                    }
-                    df_display = df_display.rename(columns={c: rename_cols.get(c, c) for c in columnas_disponibles})
+                    df_display.columns = ["Paciente", "Edad", "IMC", "PresiÃ³n Sist.", "Glucosa", "Creatinina", "Riesgo %", "Nivel"]
                     
                     # Ordenar por riesgo descendente
                     df_display = df_display.sort_values("Riesgo %", ascending=False)
                     
-                    # Mostrar tabla con colores más intensos
+                    # Mostrar tabla con colores mÃ¡s intensos
                     st.markdown("""
                     <style>
                     .tabla-riesgo {
@@ -824,13 +763,8 @@ with tab2:
                             valor = row[col]
                             if col == "Riesgo %":
                                 tabla_html += f'<td><span class="{badge_clase}">{valor:.1f}%</span></td>'
-                            elif col == "TFG":
-                                tabla_html += f'<td>{valor:.1f}</td>'
-                            elif col in ["IMC", "Creat."]:
+                            elif col == "IMC" or col == "Creatinina":
                                 tabla_html += f'<td>{valor:.2f}</td>'
-                            elif col == "Estadio":
-                                estadio_color = clasificar_estadio_erc(row.get("TFG", 90))[2]
-                                tabla_html += f'<td><span style="background:{estadio_color};color:white;padding:2px 8px;border-radius:4px;">{valor}</span></td>'
                             else:
                                 tabla_html += f'<td>{valor}</td>'
                         tabla_html += '</tr>'
@@ -841,18 +775,16 @@ with tab2:
                     # Mostrar leyenda
                     st.markdown("""
                     **Leyenda:** 
-                    🔴 **Rojo** = Crítico (>70%) | 🟡 **Amarillo** = Medio (40-70%) | 🟢 **Verde** = Normal (<40%)
-                    
-                    **Estadios ERC:** G1 (Normal) → G2 (Leve) → G3a/G3b (Moderada) → G4 (Severa) → G5 (Falla Renal)
+                    ðŸ”´ **Rojo** = CrÃ­tico (>70%) | ðŸŸ¡ **Amarillo** = Medio (40-70%) | ðŸŸ¢ **Verde** = Normal (<40%)
                     """)
                     
                     st.markdown("---")
                     
-                    # ========== BOTÓN DESCARGAR EXCEL FORMATEADO ==========
-                    st.markdown("### 📥 Descargar Reporte Excel")
+                    # ========== BOTÃ“N DESCARGAR EXCEL FORMATEADO ==========
+                    st.markdown("### ðŸ“¥ Descargar Reporte Excel")
                     
                     def generar_excel_formateado(dataframe, doctor_name):
-                        """Genera un Excel bien formateado para impresión"""
+                        """Genera un Excel bien formateado para impresiÃ³n"""
                         output = BytesIO()
                         
                         # Preparar datos
@@ -862,17 +794,14 @@ with tab2:
                         # Renombrar columnas para el reporte
                         columnas_reporte = {
                             "nombre_paciente": "Nombre del Paciente",
-                            "sexo": "Sexo",
-                            "edad": "Edad (años)",
-                            "imc": "IMC (kg/m²)",
-                            "presion_sistolica": "Presión Sistólica (mmHg)",
+                            "edad": "Edad (aÃ±os)",
+                            "imc": "IMC (kg/mÂ²)",
+                            "presion_sistolica": "PresiÃ³n SistÃ³lica (mmHg)",
                             "glucosa_ayunas": "Glucosa Ayunas (mg/dL)",
                             "creatinina": "Creatinina (mg/dL)",
-                            "tfg": "TFG (mL/min/1.73m²)",
-                            "estadio_erc": "Estadio ERC",
                             "riesgo": "Riesgo ERC (%)",
-                            "nivel": "Clasificación",
-                            "recomendacion": "Recomendación Clínica"
+                            "nivel": "ClasificaciÃ³n",
+                            "recomendacion": "RecomendaciÃ³n ClÃ­nica"
                         }
                         
                         # Seleccionar y renombrar columnas
@@ -911,20 +840,20 @@ with tab2:
                             normal_fill = PatternFill(start_color="D4EDDA", end_color="D4EDDA", fill_type="solid")
                             normal_font = Font(color="155724")
                             
-                            # Título del reporte
+                            # TÃ­tulo del reporte
                             worksheet.merge_cells('A1:I1')
-                            worksheet['A1'] = "🩺 NEFROPREDICT RD - REPORTE DE EVALUACIÓN DE RIESGO ERC"
+                            worksheet['A1'] = "ðŸ©º NEFROPREDICT RD - REPORTE DE EVALUACIÃ“N DE RIESGO ERC"
                             worksheet['A1'].font = Font(size=16, bold=True, color="002868")
                             worksheet['A1'].alignment = Alignment(horizontal='center')
                             
                             # Info del reporte
-                            worksheet['A2'] = f"Médico: {doctor_name}"
+                            worksheet['A2'] = f"MÃ©dico: {doctor_name}"
                             worksheet['A2'].font = Font(size=11, bold=True)
                             worksheet['A3'] = f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
                             worksheet['A3'].font = Font(size=11)
                             worksheet['D2'] = f"Total Pacientes: {len(df_reporte)}"
                             worksheet['D2'].font = Font(size=11, bold=True)
-                            worksheet['D3'] = f"Críticos: {len(df_excel[df_excel['riesgo']>70])} | Medio: {len(df_excel[(df_excel['riesgo']>40) & (df_excel['riesgo']<=70)])} | Normal: {len(df_excel[df_excel['riesgo']<=40])}"
+                            worksheet['D3'] = f"CrÃ­ticos: {len(df_excel[df_excel['riesgo']>70])} | Medio: {len(df_excel[(df_excel['riesgo']>40) & (df_excel['riesgo']<=70)])} | Normal: {len(df_excel[df_excel['riesgo']<=40])}"
                             worksheet['D3'].font = Font(size=11)
                             
                             # Aplicar estilos a encabezados (fila 5)
@@ -937,7 +866,7 @@ with tab2:
                             
                             # Aplicar estilos a datos
                             for row_num, (_, row_data) in enumerate(df_reporte.iterrows(), 6):
-                                # Determinar color de fila según riesgo
+                                # Determinar color de fila segÃºn riesgo
                                 riesgo_val = df_excel.iloc[row_num-6]["riesgo"]
                                 
                                 if riesgo_val > 70:
@@ -958,7 +887,7 @@ with tab2:
                                     cell.alignment = Alignment(horizontal='center', vertical='center')
                             
                             # Ajustar ancho de columnas
-                            anchos = [30, 8, 12, 15, 22, 22, 18, 20, 12, 15, 18, 35]
+                            anchos = [30, 12, 15, 22, 22, 18, 15, 18, 35]
                             for i, ancho in enumerate(anchos[:len(df_reporte.columns)], 1):
                                 worksheet.column_dimensions[get_column_letter(i)].width = ancho
                             
@@ -969,10 +898,10 @@ with tab2:
                             # Agregar leyenda al final
                             ultima_fila = len(df_reporte) + 7
                             worksheet.merge_cells(f'A{ultima_fila}:I{ultima_fila}')
-                            worksheet[f'A{ultima_fila}'] = "Leyenda: 🔴 Rojo = Crítico (>70% riesgo) | 🟡 Amarillo = Riesgo Medio (40-70%) | 🟢 Verde = Normal (<40%) | Estadios ERC: G1-G2 Normal/Leve, G3a-G3b Moderada, G4-G5 Severa/Falla"
+                            worksheet[f'A{ultima_fila}'] = "Leyenda: ðŸ”´ Rojo = CrÃ­tico (>70% riesgo) | ðŸŸ¡ Amarillo = Riesgo Medio (40-70%) | ðŸŸ¢ Verde = Normal (<40%)"
                             worksheet[f'A{ultima_fila}'].font = Font(size=10, italic=True)
                             
-                            # Configurar página para impresión
+                            # Configurar pÃ¡gina para impresiÃ³n
                             worksheet.print_title_rows = '1:5'
                             worksheet.page_setup.orientation = 'landscape'
                             worksheet.page_setup.fitToPage = True
@@ -987,7 +916,7 @@ with tab2:
                     with col_btn1:
                         excel_file = generar_excel_formateado(df_mostrar, st.session_state.doctor_name)
                         st.download_button(
-                            label="📥 Descargar Excel Formateado",
+                            label="ðŸ“¥ Descargar Excel Formateado",
                             data=excel_file,
                             file_name=f"Reporte_ERC_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -995,13 +924,10 @@ with tab2:
                         )
                     
                     with col_btn2:
-                        # También opción de CSV simple
-                        columnas_csv = ["nombre_paciente", "sexo", "edad", "imc", "presion_sistolica", 
-                                       "glucosa_ayunas", "creatinina", "tfg", "estadio_erc", "riesgo", "nivel"]
-                        cols_disponibles_csv = [c for c in columnas_csv if c in df_mostrar.columns]
-                        csv_data = df_mostrar[cols_disponibles_csv].to_csv(index=False).encode('utf-8')
+                        # TambiÃ©n opciÃ³n de CSV simple
+                        csv_data = df_mostrar[columnas_mostrar].to_csv(index=False).encode('utf-8')
                         st.download_button(
-                            label="📄 Descargar CSV Simple",
+                            label="ðŸ“„ Descargar CSV Simple",
                             data=csv_data,
                             file_name=f"Reporte_ERC_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
                             mime="text/csv",
@@ -1009,11 +935,11 @@ with tab2:
                         )
                     
                 else:
-                    st.info("No hay pacientes en esta categoría")
+                    st.info("No hay pacientes en esta categorÃ­a")
                 
                 # ========== SELECTOR DE PACIENTE INDIVIDUAL ==========
                 st.markdown("---")
-                st.markdown("### 👤 Ver Detalle de Paciente")
+                st.markdown("### ðŸ‘¤ Ver Detalle de Paciente")
                 
                 paciente_sel = st.selectbox(
                     "Seleccionar paciente para ver detalle:",
@@ -1026,61 +952,44 @@ with tab2:
                     col_det1, col_det2 = st.columns([1, 1])
                     
                     with col_det1:
-                        st.markdown(f"#### 📋 {pac_data['nombre_paciente']}")
-                        
-                        # Métricas principales
-                        m1, m2 = st.columns(2)
-                        m1.metric("🎯 Riesgo ERC", f"{pac_data['riesgo']:.1f}%", pac_data['nivel'])
-                        m2.metric("🧪 TFG", f"{pac_data['tfg']:.1f}", f"Estadio {pac_data['estadio_erc']}")
+                        st.markdown(f"#### ðŸ“‹ {pac_data['nombre_paciente']}")
                         
                         # Gauge de riesgo
                         st.plotly_chart(crear_gauge_riesgo(pac_data["riesgo"]), use_container_width=True)
                     
                     with col_det2:
-                        st.markdown("#### 📊 Datos Clínicos")
-                        
-                        # Tarjeta de estadio ERC
-                        estadio_info = clasificar_estadio_erc(pac_data["tfg"])
-                        st.markdown(f"""
-                        <div class="erc-stage {get_estadio_clase_css(pac_data['estadio_erc'])}" style="margin-bottom: 15px;">
-                            <strong>Estadio {pac_data['estadio_erc']}</strong>: {estadio_info[1]}<br>
-                            <small>{estadio_info[3]}</small>
-                        </div>
-                        """, unsafe_allow_html=True)
+                        st.markdown("#### ðŸ“Š Datos ClÃ­nicos")
                         
                         datos_tabla = {
-                            "Parámetro": ["Sexo", "Edad", "IMC", "Presión Sistólica", "Glucosa Ayunas", "Creatinina", "TFG", "Estadio ERC"],
+                            "ParÃ¡metro": ["Edad", "IMC", "PresiÃ³n SistÃ³lica", "Glucosa Ayunas", "Creatinina"],
                             "Valor": [
-                                pac_data.get('sexo', 'N/A'),
-                                f"{pac_data['edad']} años",
-                                f"{pac_data['imc']:.1f} kg/m²",
+                                f"{pac_data['edad']} aÃ±os",
+                                f"{pac_data['imc']:.1f} kg/mÂ²",
                                 f"{pac_data['presion_sistolica']} mmHg",
                                 f"{pac_data['glucosa_ayunas']} mg/dL",
-                                f"{pac_data['creatinina']:.2f} mg/dL",
-                                f"{pac_data['tfg']:.1f} mL/min/1.73m²",
-                                pac_data['estadio_erc']
+                                f"{pac_data['creatinina']:.2f} mg/dL"
                             ],
-                            "Rango Normal": ["-", "18-65", "18.5-24.9", "90-120", "70-100", "0.7-1.3", ">90", "G1"]
+                            "Rango Normal": ["18-65", "18.5-24.9", "90-120", "70-100", "0.7-1.3"]
                         }
                         st.table(pd.DataFrame(datos_tabla))
                         
                         nivel, color, reco = riesgo_level(pac_data["riesgo"])
-                        st.markdown(f"**Recomendación Riesgo:** {reco}")
+                        st.markdown(f"**RecomendaciÃ³n:** {reco}")
                         
-                        if pac_data.get("campos_vacios"):
-                            st.warning(f"⚠️ Campos no proporcionados: {pac_data['campos_vacios']}")
+                        if pac_data["campos_vacios"]:
+                            st.warning(f"âš ï¸ Campos no proporcionados: {pac_data['campos_vacios']}")
                 
             except Exception as e:
-                st.error(f"❌ Error al procesar archivo: {str(e)}")
-                st.info("Asegúrate de que el archivo tenga al menos una columna con datos numéricos o nombres de pacientes.")
+                st.error(f"âŒ Error al procesar archivo: {str(e)}")
+                st.info("AsegÃºrate de que el archivo tenga al menos una columna con datos numÃ©ricos o nombres de pacientes.")
 
 # =============================================
 # TAB 3: HISTORIAL
 # =============================================
 with tab3:
-    st.subheader("📊 Historial Clínico")
+    st.subheader("ðŸ“Š Historial ClÃ­nico")
     
-    # Obtener pacientes según rol
+    # Obtener pacientes segÃºn rol
     if st.session_state.role == "doctor":
         pacientes = db.get_patients_by_doctor(st.session_state.username)
     else:
@@ -1092,12 +1001,12 @@ with tab3:
         col1, col2 = st.columns([1, 2])
         
         with col1:
-            st.markdown("#### 🔍 Buscar Paciente")
+            st.markdown("#### ðŸ” Buscar Paciente")
             nombres = dfp["nombre_paciente"].unique().tolist()
             paciente_sel = st.selectbox("Seleccionar paciente", [""] + nombres)
             
-            # Métricas generales
-            st.markdown("#### 📈 Resumen General")
+            # MÃ©tricas generales
+            st.markdown("#### ðŸ“ˆ Resumen General")
             total = len(dfp)
             prom_riesgo = dfp["riesgo"].mean()
             alto_riesgo = len(dfp[dfp["riesgo"] > 70])
@@ -1110,22 +1019,22 @@ with tab3:
             if paciente_sel:
                 hist = dfp[dfp["nombre_paciente"] == paciente_sel].sort_values("timestamp")
                 
-                st.markdown(f"#### 📋 Historial de: **{paciente_sel}**")
+                st.markdown(f"#### ðŸ“‹ Historial de: **{paciente_sel}**")
                 
-                # Último resultado
+                # Ãšltimo resultado
                 ultimo = hist.iloc[-1]
                 nivel, color, reco = riesgo_level(ultimo["riesgo"])
                 
                 c1, c2, c3 = st.columns(3)
-                c1.metric("Último Riesgo", f"{ultimo['riesgo']:.1f}%")
+                c1.metric("Ãšltimo Riesgo", f"{ultimo['riesgo']:.1f}%")
                 c2.metric("Nivel", nivel)
                 c3.metric("Evaluaciones", len(hist))
                 
-                # Gráfico de evolución temporal
+                # GrÃ¡fico de evoluciÃ³n temporal
                 if len(hist) > 1:
                     fig_evol = px.line(
                         hist, x="timestamp", y="riesgo",
-                        title="📈 Evolución del Riesgo en el Tiempo",
+                        title="ðŸ“ˆ EvoluciÃ³n del Riesgo en el Tiempo",
                         markers=True
                     )
                     fig_evol.add_hline(y=70, line_dash="dash", line_color="red", annotation_text="Alto Riesgo")
@@ -1141,12 +1050,12 @@ with tab3:
                 )
             else:
                 # Mostrar resumen general si no hay paciente seleccionado
-                st.markdown("#### 📊 Distribución General de Riesgo")
+                st.markdown("#### ðŸ“Š DistribuciÃ³n General de Riesgo")
                 
-                # Gráfico de distribución
+                # GrÃ¡fico de distribuciÃ³n
                 fig_hist = px.histogram(
                     dfp, x="riesgo", nbins=20,
-                    title="Distribución de Niveles de Riesgo",
+                    title="DistribuciÃ³n de Niveles de Riesgo",
                     color_discrete_sequence=["#002868"]
                 )
                 fig_hist.add_vline(x=70, line_dash="dash", line_color="red")
@@ -1154,25 +1063,25 @@ with tab3:
                 st.plotly_chart(fig_hist, use_container_width=True)
                 
                 # Top pacientes alto riesgo
-                st.markdown("#### ⚠️ Pacientes con Mayor Riesgo")
+                st.markdown("#### âš ï¸ Pacientes con Mayor Riesgo")
                 top_riesgo = dfp.nlargest(10, "riesgo")[["nombre_paciente", "riesgo", "nivel", "timestamp"]]
                 st.dataframe(top_riesgo, use_container_width=True, hide_index=True)
     else:
-        st.info("📭 Aún no hay registros de pacientes")
+        st.info("ðŸ“­ AÃºn no hay registros de pacientes")
 
 # =============================================
-# TAB 4: GESTIÓN DE DOCTORES (SOLO ADMIN)
+# TAB 4: GESTIÃ“N DE DOCTORES (SOLO ADMIN)
 # =============================================
 if st.session_state.role == "admin":
     with tab4:
-        st.subheader("👥 Panel de Administración de Usuarios")
+        st.subheader("ðŸ‘¥ Panel de AdministraciÃ³n de Usuarios")
         
         # Sub-tabs dentro del panel admin
-        admin_tab1, admin_tab2, admin_tab3, admin_tab4 = st.tabs(["📋 Ver/Gestionar Doctores", "➕ Crear Doctor", "📊 Actividad y Archivos", "🔍 Auditoría"])
+        admin_tab1, admin_tab2, admin_tab3 = st.tabs(["ðŸ“‹ Ver/Gestionar Doctores", "âž• Crear Doctor", "ðŸ“Š Actividad y Archivos"])
         
         # ---------- SUB-TAB 1: VER Y GESTIONAR DOCTORES ----------
         with admin_tab1:
-            st.markdown("#### 📋 Todos los Usuarios del Sistema")
+            st.markdown("#### ðŸ“‹ Todos los Usuarios del Sistema")
             
             # Tabla resumen de todos los usuarios
             usuarios_data = []
@@ -1188,21 +1097,28 @@ if st.session_state.role == "admin":
                 usuarios_data.append({
                     "Usuario": f"@{user}",
                     "Nombre": info.get("name", user),
-                    "Rol": "👑 Admin" if info.get("role") == "admin" else "👨‍⚕️ Doctor",
-                    "Estado": "🟢 Activo" if info.get("active", True) else "🔴 Inactivo",
-                    "Contraseña": "🔒 Encriptada",
+                    "Rol": "ðŸ‘‘ Admin" if info.get("role") == "admin" else "ðŸ‘¨â€âš•ï¸ Doctor",
+                    "Estado": "ðŸŸ¢ Activo" if info.get("active", True) else "ðŸ”´ Inactivo",
+                    "ContraseÃ±a": info.get("pwd", "N/A"),
                     "Pacientes": num_pacientes,
-                    "Cargas": num_cargas,
-                    "Creado": info.get("created_at", "N/A")[:10] if info.get("created_at") else "Inicial"
+                    "Cargas": num_cargas
                 })
             
             df_usuarios = pd.DataFrame(usuarios_data)
-            st.dataframe(df_usuarios, use_container_width=True, hide_index=True)
             
-            st.info("🔒 Las contraseñas están encriptadas con bcrypt y no pueden ser visualizadas")
+            # Mostrar tabla con contraseÃ±as ocultas por defecto
+            st.markdown("##### ðŸ‘ï¸ Vista General")
+            mostrar_pwd = st.checkbox("ðŸ”“ Mostrar contraseÃ±as (solo admin)", value=False)
+            
+            if mostrar_pwd:
+                st.dataframe(df_usuarios, use_container_width=True, hide_index=True)
+            else:
+                df_oculto = df_usuarios.copy()
+                df_oculto["ContraseÃ±a"] = "â€¢â€¢â€¢â€¢â€¢â€¢"
+                st.dataframe(df_oculto, use_container_width=True, hide_index=True)
             
             st.markdown("---")
-            st.markdown("#### ⚙️ Gestionar Doctor Individual")
+            st.markdown("#### âš™ï¸ Gestionar Doctor Individual")
             
             # Selector de doctor
             doctores = {u: i for u, i in db.data["users"].items() if i["role"] == "doctor"}
@@ -1221,44 +1137,44 @@ if st.session_state.role == "admin":
                     col1, col2, col3 = st.columns(3)
                     
                     with col1:
-                        st.markdown("**🔐 Cambiar Contraseña**")
-                        nueva_pwd = st.text_input("Nueva contraseña:", type="password", key="admin_new_pwd")
-                        if st.button("💾 Guardar Contraseña", key="btn_save_pwd", use_container_width=True):
+                        st.markdown("**ðŸ” Cambiar ContraseÃ±a**")
+                        nueva_pwd = st.text_input("Nueva contraseÃ±a:", type="password", key="admin_new_pwd")
+                        if st.button("ðŸ’¾ Guardar ContraseÃ±a", key="btn_save_pwd", use_container_width=True):
                             if nueva_pwd:
-                                db.update_password(user_sel, nueva_pwd, st.session_state.username)
-                                st.success("✅ Contraseña actualizada")
+                                db.update_password(user_sel, nueva_pwd)
+                                st.success("âœ… ContraseÃ±a actualizada")
                                 st.rerun()
                             else:
-                                st.warning("Ingrese una contraseña")
+                                st.warning("Ingrese una contraseÃ±a")
                     
                     with col2:
-                        st.markdown("**🔄 Estado de Cuenta**")
-                        estado_actual = "🟢 ACTIVO" if info_sel.get("active", True) else "🔴 INACTIVO"
+                        st.markdown("**ðŸ”„ Estado de Cuenta**")
+                        estado_actual = "ðŸŸ¢ ACTIVO" if info_sel.get("active", True) else "ðŸ”´ INACTIVO"
                         st.info(f"Estado actual: {estado_actual}")
                         
                         if info_sel.get("active", True):
-                            if st.button("🚫 Desactivar Cuenta", key="btn_desactivar", use_container_width=True):
-                                db.toggle_active(user_sel, st.session_state.username)
+                            if st.button("ðŸš« Desactivar Cuenta", key="btn_desactivar", use_container_width=True):
+                                db.toggle_active(user_sel)
                                 st.warning("Cuenta desactivada")
                                 st.rerun()
                         else:
-                            if st.button("✅ Activar Cuenta", key="btn_activar", use_container_width=True):
-                                db.toggle_active(user_sel, st.session_state.username)
+                            if st.button("âœ… Activar Cuenta", key="btn_activar", use_container_width=True):
+                                db.toggle_active(user_sel)
                                 st.success("Cuenta activada")
                                 st.rerun()
                     
                     with col3:
-                        st.markdown("**🗑️ Eliminar Doctor**")
-                        st.warning("⚠️ Esta acción es irreversible")
+                        st.markdown("**ðŸ—‘ï¸ Eliminar Doctor**")
+                        st.warning("âš ï¸ Esta acciÃ³n es irreversible")
                         confirmar = st.checkbox("Confirmo que deseo eliminar", key="confirm_del")
-                        if st.button("🗑️ Eliminar Permanentemente", key="btn_eliminar", type="primary", use_container_width=True, disabled=not confirmar):
-                            db.delete_doctor(user_sel, st.session_state.username)
-                            st.success(f"Doctor {info_sel.get('name', user_sel)} eliminado")
+                        if st.button("ðŸ—‘ï¸ Eliminar Permanentemente", key="btn_eliminar", type="primary", use_container_width=True, disabled=not confirmar):
+                            db.delete_doctor(user_sel)
+                            st.success(f"Doctor {info_sel['name']} eliminado")
                             st.rerun()
                     
                     # Ver pacientes de este doctor
                     st.markdown("---")
-                    st.markdown(f"##### 📁 Pacientes de {info_sel.get('name', user_sel)}")
+                    st.markdown(f"##### ðŸ“ Pacientes de {info_sel.get('name', user_sel)}")
                     pacientes_doctor = db.get_patients_by_doctor(user_sel)
                     if pacientes_doctor:
                         df_pac = pd.DataFrame(pacientes_doctor)
@@ -1267,7 +1183,7 @@ if st.session_state.role == "admin":
                             use_container_width=True,
                             hide_index=True
                         )
-                        st.caption(f"Mostrando últimos 20 de {len(pacientes_doctor)} registros")
+                        st.caption(f"Mostrando Ãºltimos 20 de {len(pacientes_doctor)} registros")
                     else:
                         st.info("Este doctor no tiene pacientes registrados")
             else:
@@ -1275,44 +1191,44 @@ if st.session_state.role == "admin":
         
         # ---------- SUB-TAB 2: CREAR DOCTOR ----------
         with admin_tab2:
-            st.markdown("#### ➕ Registrar Nuevo Doctor")
+            st.markdown("#### âž• Registrar Nuevo Doctor")
             
             with st.form("form_nuevo_doctor"):
                 col1, col2 = st.columns(2)
                 with col1:
-                    nuevo_user = st.text_input("👤 Usuario (sin espacios)", placeholder="dr.apellido").lower().strip()
-                    nuevo_pwd = st.text_input("🔐 Contraseña", type="password")
+                    nuevo_user = st.text_input("ðŸ‘¤ Usuario (sin espacios)", placeholder="dr.apellido").lower().strip()
+                    nuevo_pwd = st.text_input("ðŸ” ContraseÃ±a", type="password")
                 with col2:
-                    nuevo_nombre = st.text_input("📝 Nombre completo", placeholder="Dr. Juan Pérez")
-                    nuevo_pwd_confirm = st.text_input("🔐 Confirmar contraseña", type="password")
+                    nuevo_nombre = st.text_input("ðŸ“ Nombre completo", placeholder="Dr. Juan PÃ©rez")
+                    nuevo_pwd_confirm = st.text_input("ðŸ” Confirmar contraseÃ±a", type="password")
                 
-                if st.form_submit_button("✅ Crear Doctor", use_container_width=True):
+                if st.form_submit_button("âœ… Crear Doctor", use_container_width=True):
                     if not nuevo_user or not nuevo_pwd or not nuevo_nombre:
-                        st.error("❌ Todos los campos son obligatorios")
+                        st.error("âŒ Todos los campos son obligatorios")
                     elif db.get_user(nuevo_user):
-                        st.error("❌ El usuario ya existe")
+                        st.error("âŒ El usuario ya existe")
                     elif " " in nuevo_user:
-                        st.error("❌ El usuario no puede tener espacios")
+                        st.error("âŒ El usuario no puede tener espacios")
                     elif nuevo_pwd != nuevo_pwd_confirm:
-                        st.error("❌ Las contraseñas no coinciden")
+                        st.error("âŒ Las contraseÃ±as no coinciden")
                     elif len(nuevo_pwd) < 4:
-                        st.error("❌ La contraseña debe tener al menos 4 caracteres")
+                        st.error("âŒ La contraseÃ±a debe tener al menos 4 caracteres")
                     else:
-                        db.create_doctor(nuevo_user, nuevo_pwd, nuevo_nombre, st.session_state.username)
-                        st.success(f"✅ Doctor **{nuevo_nombre}** creado exitosamente")
+                        db.create_doctor(nuevo_user, nuevo_pwd, nuevo_nombre)
+                        st.success(f"âœ… Doctor **{nuevo_nombre}** creado exitosamente")
                         st.balloons()
                         st.rerun()
         
         # ---------- SUB-TAB 3: ACTIVIDAD Y ARCHIVOS ----------
         with admin_tab3:
-            st.markdown("#### 📊 Ranking de Doctores más Activos")
+            st.markdown("#### ðŸ“Š Ranking de Doctores mÃ¡s Activos")
             
             all_patients = db.get_all_patients()
             
             if all_patients:
                 df_all = pd.DataFrame(all_patients)
                 
-                # Ranking por número de evaluaciones
+                # Ranking por nÃºmero de evaluaciones
                 ranking = df_all.groupby(["doctor_user", "doctor_name"]).agg({
                     "nombre_paciente": "count",
                     "riesgo": "mean"
@@ -1320,22 +1236,22 @@ if st.session_state.role == "admin":
                 ranking.columns = ["Usuario", "Doctor", "Total Evaluaciones", "Riesgo Promedio"]
                 ranking["Riesgo Promedio"] = ranking["Riesgo Promedio"].round(1)
                 ranking = ranking.sort_values("Total Evaluaciones", ascending=False)
-                ranking["🏆 Ranking"] = range(1, len(ranking) + 1)
-                ranking = ranking[["🏆 Ranking", "Doctor", "Usuario", "Total Evaluaciones", "Riesgo Promedio"]]
+                ranking["ðŸ† Ranking"] = range(1, len(ranking) + 1)
+                ranking = ranking[["ðŸ† Ranking", "Doctor", "Usuario", "Total Evaluaciones", "Riesgo Promedio"]]
                 
                 # Mostrar podio
                 col1, col2, col3 = st.columns(3)
                 if len(ranking) >= 1:
-                    col2.metric("🥇 1er Lugar", ranking.iloc[0]["Doctor"], f"{ranking.iloc[0]['Total Evaluaciones']} evaluaciones")
+                    col2.metric("ðŸ¥‡ 1er Lugar", ranking.iloc[0]["Doctor"], f"{ranking.iloc[0]['Total Evaluaciones']} evaluaciones")
                 if len(ranking) >= 2:
-                    col1.metric("🥈 2do Lugar", ranking.iloc[1]["Doctor"], f"{ranking.iloc[1]['Total Evaluaciones']} evaluaciones")
+                    col1.metric("ðŸ¥ˆ 2do Lugar", ranking.iloc[1]["Doctor"], f"{ranking.iloc[1]['Total Evaluaciones']} evaluaciones")
                 if len(ranking) >= 3:
-                    col3.metric("🥉 3er Lugar", ranking.iloc[2]["Doctor"], f"{ranking.iloc[2]['Total Evaluaciones']} evaluaciones")
+                    col3.metric("ðŸ¥‰ 3er Lugar", ranking.iloc[2]["Doctor"], f"{ranking.iloc[2]['Total Evaluaciones']} evaluaciones")
                 
-                st.markdown("##### 📋 Tabla Completa de Actividad")
+                st.markdown("##### ðŸ“‹ Tabla Completa de Actividad")
                 st.dataframe(ranking, use_container_width=True, hide_index=True)
                 
-                # Gráfico de barras
+                # GrÃ¡fico de barras
                 fig_ranking = px.bar(
                     ranking.head(10), 
                     x="Doctor", 
@@ -1346,10 +1262,10 @@ if st.session_state.role == "admin":
                 )
                 st.plotly_chart(fig_ranking, use_container_width=True)
             else:
-                st.info("No hay actividad registrada aún")
+                st.info("No hay actividad registrada aÃºn")
             
             st.markdown("---")
-            st.markdown("#### 📤 Historial de Cargas Masivas")
+            st.markdown("#### ðŸ“¤ Historial de Cargas Masivas")
             
             uploads = db.data.get("uploads", [])
             if uploads:
@@ -1359,113 +1275,26 @@ if st.session_state.role == "admin":
                 st.info("No hay cargas masivas registradas")
             
             st.markdown("---")
-            st.markdown("#### 🔒 Acceso a Datos por Doctor")
-            st.info("👆 Selecciona un doctor en la pestaña 'Ver/Gestionar Doctores' para ver sus pacientes. Los datos de cada doctor están completamente aislados y nunca se cruzan entre médicos.")
-        
-        # ---------- SUB-TAB 4: AUDITORÍA ----------
-        with admin_tab4:
-            st.markdown("#### 🔍 Registro de Auditoría del Sistema")
-            st.markdown("Todas las acciones importantes son registradas para cumplimiento y seguridad.")
-            
-            # Filtros
-            col_f1, col_f2, col_f3 = st.columns(3)
-            with col_f1:
-                filtro_tipo = st.selectbox("Filtrar por tipo:", 
-                    ["Todos", "LOGIN", "LOGIN_FAILED", "EVALUATION", "USER_CREATED", 
-                     "USER_DELETED", "PASSWORD_CHANGED", "USER_STATUS_CHANGED", "SECURITY"])
-            with col_f2:
-                usuarios_list = ["Todos"] + list(db.data["users"].keys())
-                filtro_usuario = st.selectbox("Filtrar por usuario:", usuarios_list)
-            with col_f3:
-                limite = st.number_input("Mostrar últimos:", 50, 500, 100, 50)
-            
-            # Obtener logs
-            tipo_f = None if filtro_tipo == "Todos" else filtro_tipo
-            user_f = None if filtro_usuario == "Todos" else filtro_usuario
-            logs = db.get_audit_log(limit=limite, user_filter=user_f, type_filter=tipo_f)
-            
-            if logs:
-                # Estadísticas rápidas
-                st.markdown("##### 📊 Resumen de Actividad")
-                col_s1, col_s2, col_s3, col_s4 = st.columns(4)
-                
-                all_logs = db.get_audit_log(limit=1000)
-                logins_hoy = len([l for l in all_logs if l.get("type") == "LOGIN" and l.get("timestamp", "")[:10] == datetime.now().strftime("%Y-%m-%d")])
-                logins_fallidos = len([l for l in all_logs if l.get("type") == "LOGIN_FAILED"])
-                evaluaciones = len([l for l in all_logs if l.get("type") == "EVALUATION"])
-                cambios_usuarios = len([l for l in all_logs if l.get("type") in ["USER_CREATED", "USER_DELETED", "PASSWORD_CHANGED"]])
-                
-                col_s1.metric("🔐 Logins Hoy", logins_hoy)
-                col_s2.metric("⚠️ Logins Fallidos", logins_fallidos)
-                col_s3.metric("📋 Evaluaciones", evaluaciones)
-                col_s4.metric("👥 Cambios Usuarios", cambios_usuarios)
-                
-                st.markdown("---")
-                st.markdown("##### 📜 Registro de Eventos")
-                
-                # Mostrar logs con colores según tipo
-                for log in logs:
-                    timestamp = log.get("timestamp", "")[:19].replace("T", " ")
-                    user = log.get("user", "N/A")
-                    action = log.get("action", "N/A")
-                    log_type = log.get("type", "INFO")
-                    
-                    # Color según tipo
-                    if log_type in ["LOGIN_FAILED", "SECURITY"]:
-                        color = "#dc3545"
-                        icon = "🚨"
-                    elif log_type == "LOGIN":
-                        color = "#28a745"
-                        icon = "✅"
-                    elif log_type == "EVALUATION":
-                        color = "#007bff"
-                        icon = "📋"
-                    elif log_type in ["USER_CREATED", "USER_DELETED", "PASSWORD_CHANGED", "USER_STATUS_CHANGED"]:
-                        color = "#fd7e14"
-                        icon = "👤"
-                    else:
-                        color = "#6c757d"
-                        icon = "ℹ️"
-                    
-                    st.markdown(f"""
-                    <div class="audit-log" style="border-left-color: {color};">
-                        <span style="color: #666; font-size: 0.85em;">{timestamp}</span> 
-                        <span style="background: {color}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; margin: 0 8px;">{log_type}</span>
-                        <strong>@{user}</strong>: {icon} {action}
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                # Exportar logs
-                st.markdown("---")
-                df_logs = pd.DataFrame(logs)
-                csv_logs = df_logs.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    "📥 Exportar Logs a CSV",
-                    csv_logs,
-                    f"audit_log_{datetime.now().strftime('%Y%m%d')}.csv",
-                    "text/csv",
-                    use_container_width=True
-                )
-            else:
-                st.info("No hay registros de auditoría con los filtros seleccionados")
+            st.markdown("#### ðŸ”’ Acceso a Datos por Doctor")
+            st.info("ðŸ‘† Selecciona un doctor en la pestaÃ±a 'Ver/Gestionar Doctores' para ver sus pacientes. Los datos de cada doctor estÃ¡n completamente aislados y nunca se cruzan entre mÃ©dicos.")
 
     # =============================================
-    # TAB 5: ESTADÍSTICAS ADMIN
+    # TAB 5: ESTADÃSTICAS ADMIN
     # =============================================
     with tab5:
-        st.subheader("📈 Estadísticas del Sistema")
+        st.subheader("ðŸ“ˆ EstadÃ­sticas del Sistema")
         
         all_patients = db.get_all_patients()
         
         if all_patients:
             df_all = pd.DataFrame(all_patients)
             
-            # Métricas principales
+            # MÃ©tricas principales
             c1, c2, c3, c4 = st.columns(4)
-            c1.metric("📊 Total Evaluaciones", len(df_all))
-            c2.metric("👥 Pacientes Únicos", df_all["nombre_paciente"].nunique())
-            c3.metric("📈 Riesgo Promedio", f"{df_all['riesgo'].mean():.1f}%")
-            c4.metric("⚠️ Alto Riesgo", len(df_all[df_all["riesgo"] > 70]))
+            c1.metric("ðŸ“Š Total Evaluaciones", len(df_all))
+            c2.metric("ðŸ‘¥ Pacientes Ãšnicos", df_all["nombre_paciente"].nunique())
+            c3.metric("ðŸ“ˆ Riesgo Promedio", f"{df_all['riesgo'].mean():.1f}%")
+            c4.metric("âš ï¸ Alto Riesgo", len(df_all[df_all["riesgo"] > 70]))
             
             st.markdown("---")
             
@@ -1473,7 +1302,7 @@ if st.session_state.role == "admin":
             
             with col1:
                 # Evaluaciones por doctor
-                st.markdown("#### 👨‍⚕️ Evaluaciones por Doctor")
+                st.markdown("#### ðŸ‘¨â€âš•ï¸ Evaluaciones por Doctor")
                 por_doctor = df_all["doctor_name"].value_counts().reset_index()
                 por_doctor.columns = ["Doctor", "Evaluaciones"]
                 fig_doc = px.bar(por_doctor, x="Doctor", y="Evaluaciones", color="Evaluaciones",
@@ -1481,29 +1310,29 @@ if st.session_state.role == "admin":
                 st.plotly_chart(fig_doc, use_container_width=True)
             
             with col2:
-                # Distribución de riesgo
-                st.markdown("#### 📊 Distribución de Riesgo")
+                # DistribuciÃ³n de riesgo
+                st.markdown("#### ðŸ“Š DistribuciÃ³n de Riesgo")
                 df_all["categoria"] = df_all["riesgo"].apply(
                     lambda x: "Alto (>70%)" if x > 70 else "Medio (40-70%)" if x > 40 else "Bajo (<40%)"
                 )
                 por_cat = df_all["categoria"].value_counts().reset_index()
-                por_cat.columns = ["Categoría", "Cantidad"]
-                fig_cat = px.pie(por_cat, values="Cantidad", names="Categoría",
+                por_cat.columns = ["CategorÃ­a", "Cantidad"]
+                fig_cat = px.pie(por_cat, values="Cantidad", names="CategorÃ­a",
                                 color_discrete_sequence=["#CE1126", "#FFC400", "#4CAF50"])
                 st.plotly_chart(fig_cat, use_container_width=True)
             
             # Tendencia temporal
-            st.markdown("#### 📅 Tendencia de Evaluaciones")
+            st.markdown("#### ðŸ“… Tendencia de Evaluaciones")
             df_all["fecha"] = pd.to_datetime(df_all["timestamp"]).dt.date
             por_fecha = df_all.groupby("fecha").agg({"riesgo": ["count", "mean"]}).reset_index()
             por_fecha.columns = ["Fecha", "Cantidad", "Riesgo Promedio"]
             
             fig_trend = px.line(por_fecha, x="Fecha", y="Cantidad", 
-                               title="Evaluaciones por Día", markers=True)
+                               title="Evaluaciones por DÃ­a", markers=True)
             st.plotly_chart(fig_trend, use_container_width=True)
             
             # Tabla resumen por doctor
-            st.markdown("#### 📋 Resumen por Doctor")
+            st.markdown("#### ðŸ“‹ Resumen por Doctor")
             resumen = df_all.groupby("doctor_name").agg({
                 "nombre_paciente": "count",
                 "riesgo": "mean"
@@ -1512,10 +1341,12 @@ if st.session_state.role == "admin":
             resumen["Riesgo Promedio"] = resumen["Riesgo Promedio"].round(1)
             st.dataframe(resumen, use_container_width=True, hide_index=True)
         else:
-            st.info("📭 Aún no hay datos para mostrar estadísticas")
+            st.info("ðŸ“­ AÃºn no hay datos para mostrar estadÃ­sticas")
 
 # =============================================
 # FOOTER
 # =============================================
 st.markdown("---")
-st.caption("🩺 NefroPredict RD © 2025 • Sistema de Detección Temprana de ERC • República Dominicana")
+st.caption("ðŸ©º NefroPredict RD Â© 2025 â€¢ Sistema de DetecciÃ³n Temprana de ERC â€¢ RepÃºblica Dominicana")
+
+
