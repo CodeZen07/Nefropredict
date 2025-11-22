@@ -701,7 +701,7 @@ if st.session_state.role == "admin":
             doctores = {u: i for u, i in db.data["users"].items() if i["role"] == "doctor"}
             
             if doctores:
-                opciones_doctores = [f"{info['name']} (@{user})" for user, info in doctores.items()]
+                opciones_doctores = [f"{info.get('name', user)} (@{user})" for user, info in doctores.items()]
                 doctor_seleccionado = st.selectbox("Seleccionar doctor a gestionar:", [""] + opciones_doctores)
                 
                 if doctor_seleccionado:
