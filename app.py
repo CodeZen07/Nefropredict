@@ -4,36 +4,77 @@ import numpy as np
 import time
 import joblib 
 
-# --- CONFIGURACIÓN Y MOCK DE USUARIOS ---
-
-# MOCK de usuarios. En una app real, esto se manejaría con Firebase Auth y Firestore
-MOCK_USERS = {
-    "admin": {"pwd": "admin", "role": "admin", "id": "admin_nefro"},
-    "dr.perez": {"pwd": "pass1", "role": "doctor", "id": "dr_perez_uid_001"},
-    "dr.gomez": {"pwd": "pass2", "role": "doctor", "id": "dr_gomez_uid_002"},
-    "dr.sanchez": {"pwd": "pass3", "role": "doctor", "id": "dr_sanchez_uid_003"},
-}
-
-# Historial de archivos simulado por usuario.
-# Esto simula cómo Firestore aislaría los datos:
-# /artifacts/{appId}/users/dr_perez_uid_001/pacientes/archivo_1
-# /artifacts/{appId}/users/dr_gomez_uid_002/pacientes/archivo_1
-MOCK_HISTORY = {
-    "admin_nefro": [
-        {"timestamp": "2025-05-01 10:00", "filename": "Test_Global.xlsx", "patients": 100},
-    ],
-    "dr_perez_uid_001": [
-        {"timestamp": "2025-05-02 14:30", "filename": "Mis_Pacientes_Q1_2025.xlsx", "patients": 55},
-        {"timestamp": "2025-05-03 09:15", "filename": "Consulta_Semanal.xlsx", "patients": 12},
-    ],
-    "dr_gomez_uid_002": [
-        {"timestamp": "2025-05-01 11:00", "filename": "Pacientes_HTA.xlsx", "patients": 80},
-    ]
-}
-
-
-# --- 1. Configuración de la página ---
+# --- CONFIGURACIÓN DE LA PÁGINA Y ESTADO INICIAL ---
 st.set_page_config(page_title="NefroPredict RD", page_icon="🫘", layout="wide")
+
+# --- 0. Inicialización de Sesión y Datos Simulación ---
+
+# Inicialización de la Session State para persistencia temporal (simulando Firestore)
+if 'MOCK_USERS' not in st.session_state:
+    st.session_state.MOCK_USERS = {
+        # 'active': True por defecto. Lo usamos para la gestión de cuentas.
+        "admin": {"pwd": "admin", "role": "admin", "id": "admin_nefro", "active": True},
+        "dr.perez": {"pwd": "pass1", "role": "doctor", "id": "dr_perez_uid_001", "active": True},
+        "dr.gomez": {"pwd": "pass2", "role": "doctor", "id": "dr_gomez_uid_002", "active": True},
+        "dr.sanchez": {"pwd": "pass3", "role": "doctor", "id": "dr_sanchez_uid_003", "active": False}, # Cuenta inactiva de prueba
+    }
+
+if 'MOCK_HISTORY' not in st.session_state:
+    # Historial de archivos simulado por usuario.
+    st.session_state.MOCK_HISTORY = {
+        "admin_nefro": [
+            {"usuario": "admin", "timestamp": "2025-05-01 10:00", "filename": "Test_Global.xlsx", "patients": 100},
+        ],
+        "dr_perez_uid_001": [
+            {"usuario": "dr.perez", "timestamp": "2025-05-02 14:30", "filename": "Mis_Pacientes_Q1_2025.xlsx", "patients": 55},
+            {"usuario": "dr.perez", "timestamp": "2025-05-03 09:15", "filename": "Consulta_Semanal.xlsx", "patients": 12},
+        ],
+        "dr_gomez_uid_002": [
+            {"usuario": "dr.gomez", "timestamp": "2025-05-01 11:00", "filename": "Pacientes_HTA.xlsx", "patients": 80},
+            {"usuario": "dr.gomez", "timestamp": "2025-05-01 16:00", "filename": "Revision_Mensual.xlsx", "patients": 20},
+        ]
+    }
+
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+    st.session_state.user_id = None
+    st.session_state.user_role = None
+    st.session_state.username = None
+
+
+# --- 1. Funciones de Acceso a Datos (Simulación de DB) ---
+
+def create_new_user(username, password):
+    """Simula la creación de un nuevo usuario en la DB."""
+    if username in st.session_state.MOCK_USERS:
+        return False, "Ese nombre de usuario ya existe."
+    
+    user_id = f"dr_{username}_uid_{len(st.session_state.MOCK_USERS) + 1}"
+    # Guardar en Session State
+    st.session_state.MOCK_USERS[username] = {"pwd": password, "role": "doctor", "id": user_id, "active": True}
+    st.session_state.MOCK_HISTORY[user_id] = []
+    return True, f"Médico '{username}' creado con éxito (ID: {user_id})."
+
+def update_user_status(username, is_active):
+    """Simula la activación/desactivación de un usuario en la DB."""
+    if username in st.session_state.MOCK_USERS and st.session_state.MOCK_USERS[username]['role'] == 'doctor':
+        st.session_state.MOCK_USERS[username]['active'] = is_active
+        return True
+    return False
+
+def get_doctors():
+    """Obtiene la lista de todos los médicos (no admin)."""
+    return {k: v for k, v in st.session_state.MOCK_USERS.items() if v['role'] == 'doctor'}
+
+def get_global_history():
+    """Obtiene y combina el historial de todos los usuarios."""
+    all_records = []
+    for user_id, history_list in st.session_state.MOCK_HISTORY.items():
+        all_records.extend(history_list)
+    if all_records:
+        return pd.DataFrame(all_records)
+    return pd.DataFrame()
+
 
 # --- 2. Título y Branding ---
 st.markdown("<h1 style='text-align: center; color:#002868;'>🫘 NefroPredict RD 2025</h1>", unsafe_allow_html=True)
@@ -56,14 +97,9 @@ model_loaded = nefro_model is not None
 
 
 # --- 3. SISTEMA DE AUTENTICACIÓN Y ROLES ---
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
-    st.session_state.user_id = None
-    st.session_state.user_role = None
-    st.session_state.username = None
 
 def check_login():
-    """Maneja el flujo de login usando usuarios mockeados."""
+    """Maneja el flujo de login y verifica el estado 'active'."""
     if not st.session_state.logged_in:
         st.markdown("### 🔐 Acceso de Usuario")
         
@@ -74,10 +110,18 @@ def check_login():
             submitted = st.form_submit_button("Ingresar")
 
             if submitted:
-                if user in MOCK_USERS and MOCK_USERS[user]['pwd'] == pwd:
+                if user in st.session_state.MOCK_USERS and st.session_state.MOCK_USERS[user]['pwd'] == pwd:
+                    user_data = st.session_state.MOCK_USERS[user]
+                    
+                    # Verificar si la cuenta está activa
+                    if not user_data.get('active', True):
+                        st.error("Tu cuenta ha sido desactivada. Por favor, contacta al administrador.")
+                        return False
+
+                    # Login exitoso
                     st.session_state.logged_in = True
-                    st.session_state.user_id = MOCK_USERS[user]['id']
-                    st.session_state.user_role = MOCK_USERS[user]['role']
+                    st.session_state.user_id = user_data['id']
+                    st.session_state.user_role = user_data['role']
                     st.session_state.username = user
                     st.success(f"¡Acceso concedido! Rol: {st.session_state.user_role.capitalize()}")
                     time.sleep(0.1)
@@ -85,8 +129,7 @@ def check_login():
                 else:
                     st.error("Usuario o contraseña incorrectos.")
         
-        # Muestra una pista para que el usuario pueda probar
-        st.sidebar.caption("Usuarios de prueba: `admin`/`admin` | `dr.perez`/`pass1`")
+        st.sidebar.caption("Usuarios de prueba: `admin`/`admin` | `dr.perez`/`pass1` | `dr.sanchez`/`pass3` (Inactivo)")
         st.stop()
     return True
 
@@ -96,7 +139,8 @@ if not check_login():
 # Mostrar información de sesión y botón de Logout
 col_user, col_logout = st.columns([4, 1])
 with col_user:
-    st.success(f"✅ Sesión activa | Usuario: **{st.session_state.username}** | Rol: **{st.session_state.user_role.capitalize()}**")
+    status = "Activo" if st.session_state.MOCK_USERS[st.session_state.username].get('active', True) else "INACTIVO"
+    st.success(f"✅ Sesión activa | Usuario: **{st.session_state.username}** | Rol: **{st.session_state.user_role.capitalize()}** | Estado: **{status}**")
 with col_logout:
     if st.button("Cerrar Sesión"):
         st.session_state.logged_in = False
@@ -111,45 +155,124 @@ st.markdown("---")
 if st.session_state.user_role == 'admin':
     st.subheader("⚙️ Panel de Administración")
     
-    col_add, col_list = st.columns(2)
-    
-    with col_add:
-        st.markdown("#### ➕ Añadir Nuevo Médico (Simulación)")
-        st.info("Nota: En una app real, este proceso registraría la cuenta en Firebase Auth.")
+    tab_dashboard, tab_users, tab_files = st.tabs(["Dashboard de Uso", "Gestión de Médicos", "Historial Global"])
+
+    # --- TAB 1: DASHBOARD DE USO (KPIs) ---
+    with tab_dashboard:
+        st.markdown("#### 📊 Dashboard de Uso (KPIs)")
         
-        # Formulario simulado para añadir médico
-        new_user = st.text_input("Nombre de Usuario del Nuevo Médico (ej: dr.nuevo)", key="new_user_input")
-        new_pwd = st.text_input("Contraseña Temporal", type="password", key="new_pwd_input")
-        if st.button("Crear Médico"):
-            if new_user and new_pwd:
-                # Lógica mock para añadir
-                if new_user not in MOCK_USERS:
-                    # En Firestore/Auth, aquí se crearía la cuenta y se obtendría un UID
-                    MOCK_USERS[new_user] = {"pwd": new_pwd, "role": "doctor", "id": f"dr_{new_user}_uid"}
-                    st.success(f"Médico '{new_user}' creado con éxito (ID simulado: dr_{new_user}_uid).")
-                else:
-                    st.error("Ese nombre de usuario ya existe.")
-            else:
-                st.warning("Debes llenar ambos campos.")
-                
-    with col_list:
-        st.markdown("#### 📋 Médicos Activos")
-        # Filtrar solo los doctores del mock
-        doctors = {k: v for k, v in MOCK_USERS.items() if v['role'] == 'doctor'}
+        df_history = get_global_history()
         
-        if doctors:
-            doctor_list = [{"Usuario": user, "ID de Sistema": details['id']} for user, details in doctors.items()]
-            st.dataframe(pd.DataFrame(doctor_list), use_container_width=True, hide_index=True)
-            st.caption(f"Total de Médicos: {len(doctors)}")
+        if not df_history.empty:
+            
+            # Cálculo de Métricas Clave
+            total_files = len(df_history)
+            total_patients_evaluated = df_history['patients'].sum()
+            
+            col_kpi1, col_kpi2, col_kpi3 = st.columns(3)
+            
+            col_kpi1.metric("Total Histórico de Pacientes Evaluados", f"{total_patients_evaluated:,}")
+            col_kpi2.metric("Archivos Totales Procesados", total_files)
+            
+            # Conteo de Médicos Activos/Inactivos
+            all_doctors = get_doctors()
+            active_doctors = sum(1 for d in all_doctors.values() if d.get('active', True))
+            inactive_doctors = len(all_doctors) - active_doctors
+            col_kpi3.metric("Médicos Activos", active_doctors, delta=-inactive_doctors, delta_color="inverse")
+            
+            st.markdown("---")
+            st.markdown("#### 📈 Top 5 Médicos por Uso (Pacientes Evaluados)")
+            
+            # Uso por médico
+            usage_by_doctor = df_history.groupby('usuario')['patients'].sum().sort_values(ascending=False).head(5)
+            st.bar_chart(usage_by_doctor, color="#CE1126") # Rojo RD
         else:
-            st.info("Aún no hay médicos registrados.")
+            st.info("No hay datos históricos para mostrar métricas.")
+
+
+    # --- TAB 2: GESTIÓN DE MÉDICOS ---
+    with tab_users:
+        col_add, col_list = st.columns(2)
+        
+        with col_add:
+            st.markdown("#### ➕ Crear Nuevo Médico")
+            st.info("Nota: Estos cambios son persistentes mientras la sesión de Streamlit esté activa.")
+            
+            # Formulario para añadir médico
+            new_user = st.text_input("Nombre de Usuario del Nuevo Médico", key="new_user_input")
+            new_pwd = st.text_input("Contraseña Temporal", type="password", key="new_pwd_input")
+            if st.button("Crear Médico y Acceso"):
+                if new_user and new_pwd:
+                    success, message = create_new_user(new_user.lower(), new_pwd)
+                    if success:
+                        st.success(message)
+                        st.rerun()
+                    else:
+                        st.error(message)
+                else:
+                    st.warning("Debes llenar ambos campos.")
+                    
+        with col_list:
+            st.markdown("#### 📋 Listado de Médicos")
+            doctors = get_doctors()
+            
+            if doctors:
+                doctor_list = [{"Usuario": user, "ID de Sistema": details['id'], "Estado": "✅ Activo" if details.get('active', True) else "🚫 Inactivo"} for user, details in doctors.items()]
+                st.dataframe(pd.DataFrame(doctor_list), use_container_width=True, hide_index=True)
+                st.caption(f"Total de Médicos: {len(doctors)}")
+            else:
+                st.info("Aún no hay médicos registrados.")
+
+            st.markdown("---")
+            st.markdown("#### 🚫 Suspender/Activar Cuentas")
+            
+            # Lógica para suspender/activar
+            if doctors:
+                user_to_manage = st.selectbox("Selecciona un Médico para Gestionar", sorted(list(doctors.keys())), key="user_to_manage")
+                current_status = doctors[user_to_manage].get('active', True)
+                
+                # Usamos el estado actual para la selección inicial
+                default_index = 0 if current_status else 1 
+                
+                new_status = st.radio(
+                    "Estado de la Cuenta", 
+                    ["Activo", "Inactivo"], 
+                    index=default_index,
+                    key="status_radio"
+                )
+                
+                if st.button("Aplicar Cambio de Estado"):
+                    is_active = (new_status == "Activo")
+                    if update_user_status(user_to_manage, is_active):
+                        st.success(f"Estado de '{user_to_manage}' actualizado a: {new_status}")
+                        st.rerun()
+                    else:
+                        st.error("Error al actualizar el estado del usuario.")
+            else:
+                st.info("No hay médicos para gestionar.")
+
+
+    # --- TAB 3: HISTORIAL GLOBAL DE ARCHIVOS ---
+    with tab_files:
+        st.markdown("#### 📁 Archivos Subidos por Todos los Médicos")
+        st.info("Vista global de auditoría de uso de la plataforma.")
+        
+        all_history_df = get_global_history()
+        
+        if not all_history_df.empty:
+            # Asegurar que el usuario y la marca de tiempo estén presentes
+            cols = ['usuario', 'timestamp', 'filename', 'patients']
+            display_df = all_history_df[cols].sort_values(by='timestamp', ascending=False)
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("Aún no hay ningún archivo subido por ningún usuario.")
     
     st.markdown("---")
 # --- FIN PANEL DE ADMINISTRACIÓN ---
 
 
 # --- FUNCIONES DE INTERPRETACIÓN DEL MODELO (SIMULACIÓN SHAP) ---
-# ... (funciones generate_explanation_data y display_explanation)
+# ... (funciones generate_explanation_data y display_explanation se mantienen igual)
 def generate_explanation_data(row):
     """
     Simula la contribución de cada característica al riesgo (como los valores SHAP).
@@ -248,13 +371,8 @@ def display_explanation(data):
     
     # Renderizar cada barra
     for feature, contribution in data.items():
-        # Escalar el valor de contribución a un porcentaje de 0 a 100 para el ancho de la barra
-        # El 50% del wrapper es el punto central (0)
-        
-        # Calcular el ancho total de la barra
         width_percent = (abs(contribution) / max_val) * 50
         
-        # Definir color y posición (izquierda para negativo/rojo, derecha para positivo/verde)
         if contribution > 0:
             color = "#CE1126" # Rojo (Aumenta el riesgo)
             position = f"left: 50%; width: {width_percent}%;"
@@ -286,8 +404,6 @@ st.subheader("1. Carga de datos de pacientes")
 uploaded = st.file_uploader("📁 Sube tu archivo Excel de pacientes", type=["xlsx", "xls"])
 
 if uploaded:
-    # Lógica de guardado simulado: AQUI ES DONDE OCURRE EL AISLAMIENTO
-    # Si la carga es exitosa, se registra en el historial MOCK_HISTORY asociado al user_id actual
     try:
         df = pd.read_excel(uploaded)
         st.success(f"¡Cargados {len(df)} pacientes correctamente!")
@@ -316,6 +432,21 @@ if uploaded:
 
         # --- 5. Presentación de Resultados ---
         st.subheader("2. Resultados predictivos y recomendaciones")
+
+        # Registro del archivo subido en el historial (simulando guardado)
+        now = time.strftime("%Y-%m-%d %H:%M:%S")
+        record = {
+            "usuario": st.session_state.username,
+            "timestamp": now,
+            "filename": uploaded.name,
+            "patients": len(df)
+        }
+        
+        # Agregar al historial del usuario actual
+        if st.session_state.user_id not in st.session_state.MOCK_HISTORY:
+            st.session_state.MOCK_HISTORY[st.session_state.user_id] = []
+        
+        st.session_state.MOCK_HISTORY[st.session_state.user_id].insert(0, record)
 
         # Métricas de resumen general
         total_alto_riesgo = len(df[df['Riesgo_ERC_5años_%'] > 70])
@@ -410,16 +541,15 @@ st.markdown("---")
 st.subheader("Historial de Archivos del Usuario Actual")
 st.info(f"Solo se muestra el historial asociado a tu ID: **{st.session_state.user_id}**")
 
-current_history = MOCK_HISTORY.get(st.session_state.user_id, [])
+current_history = st.session_state.MOCK_HISTORY.get(st.session_state.user_id, [])
 
 if current_history:
     history_df = pd.DataFrame(current_history)
-    st.dataframe(history_df, use_container_width=True)
+    st.dataframe(history_df, use_container_width=True, hide_index=True)
     st.caption("Esta información estaría guardada en Firestore bajo una ruta exclusiva para tu ID (`/users/{tu_id}/archivos`).")
 else:
     st.info("No has subido ningún archivo aún.")
 
-# --- 8. Footer (Corregido) ---
+# --- 8. Footer ---
 st.markdown("---")
-# ERROR CORREGIDO: Se cerró correctamente la cadena de texto con comillas dobles.
 st.markdown("<p style='text-align: center; color:#002868; font-weight:bold;'>© 2025 NefroPredict RD - Soluciones de salud impulsadas por IA</p>", unsafe_allow_html=True)
