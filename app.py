@@ -8,9 +8,10 @@ import io
 import streamlit as st
 import altair as alt
 import streamlit.components.v1 as components
+from datetime import datetime
 
 # =============================================
-# CONFIGURACIÓN DE PÁGINA
+# CONFIGURACIÓN
 # =============================================
 st.set_page_config(page_title="NefroPredict RD", page_icon="Kidney", layout="wide")
 
@@ -23,15 +24,9 @@ st.markdown("""
     html, body, [class*="css"] {font-family: 'Inter', sans-serif;}
     h1, h2, h3 {color: #002868 !important;}
     .stButton > button {background: #002868; color: white; border-radius: 12px; padding: 0.7rem 1.5rem;}
-    .risk-gauge-bar {
-        height: 40px; border-radius: 20px;
-        background: linear-gradient(to right, #10B981 0%, #FACC15 40%, #F97316 70%, #EF4444 100%);
-        position: relative; margin: 20px 0;
-    }
-    .risk-gauge-marker {
-        position: absolute; top: -20px; left: var(--pos); transform: translateX(-50%);
-        width: 12px; height: 80px; background: white; border: 4px solid black; border-radius: 6px;
-    }
+    .risk-high {background-color: #FEF2F2; border-left: 6px solid #EF4444;}
+    .risk-medium {background-color: #FFFBEB; border-left: 6px solid #F97316;}
+    .risk-low {background-color: #F0FDF4; border-left: 6px solid #10B981;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -39,7 +34,7 @@ st.markdown("<h1 style='text-align: center;'>NefroPredict RD 2025</h1>", unsafe_
 st.markdown("<h3 style='text-align: center; color:#555;'>Detección temprana de ERC • República Dominicana</h3>", unsafe_allow_html=True)
 
 # =============================================
-# BASE DE DATOS SIMULADA (JSON)
+# BASE DE DATOS
 # =============================================
 DB_FILE = "nefro_db.json"
 
@@ -52,19 +47,18 @@ class DataStore:
     def _init_db(self):
         data = {
             "users": {
-                "admin": {"pwd": "admin", "role": "admin", "id": "admin_001", "active": True},
+                "admin": {"pwd": "admin2025", "role": "admin", "id": "admin_001", "active": True},
                 "dr.perez": {"pwd": "pass1", "role": "doctor", "id": "dr_001", "active": True},
                 "dr.gomez": {"pwd": "pass2", "role": "doctor", "id": "dr_002", "active": True}
             },
-            "file_history": [],
-            "patient_records": []
+            "patient_records": [],
+            "mass_uploads": []
         }
         with open(self.path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4)
 
     def _load(self):
-        if not os.path.exists(self.path):
-            self._init_db()
+        if not os.path.exists(self.path): self._init_db()
         with open(self.path, "r", encoding="utf-8") as f:
             return json.load(f)
 
@@ -96,29 +90,33 @@ class DataStore:
         data["patient_records"].insert(0, record)
         self._save(data)
 
-    def get_patient_records(self, name):
+    def add_mass_upload(self, record):
         data = self._load()
-        return sorted(
-            [r for r in data["patient_records"] if r["nombre_paciente"].lower() == name.lower()],
-            key=lambda x: x["timestamp"], reverse=True
-        )
+        data["mass_uploads"].insert(0, record)
+        self._save(data)
 
-    def get_all_patient_names(self):
+    def get_records_by_user(self, user_id):
         data = self._load()
-        names = {r["nombre_paciente"] for r in data["patient_records"] if "nombre_paciente" in r}
-        return sorted(names)
+        return [r for r in data["patient_records"] if r["user_id"] == user_id]
+
+    def get_all_records(self):
+        return self._load().get("patient_records", [])
+
+    def get_mass_uploads_by_user(self, user_id):
+        data = self._load()
+        return [r for r in data["mass_uploads"] if r["user_id"] == user_id]
 
 db = DataStore(DB_FILE)
 
 # =============================================
-# CARGA DEL MODELO
+# MODELO
 # =============================================
 @st.cache_resource
 def load_model():
     try:
         return joblib.load("modelo_erc.joblib")
     except:
-        st.sidebar.warning("Modelo no encontrado → Modo simulación")
+        st.sidebar.warning("Modo simulación activado")
         return None
 
 model = load_model()
@@ -141,182 +139,167 @@ if not st.session_state.logged_in:
                 st.session_state.username = user
                 st.session_state.role = u["role"]
                 st.session_state.user_id = u["id"]
-                st.success("¡Bienvenido!")
-                time.sleep(0.5)
                 st.rerun()
             else:
-                st.error("Credenciales incorrectas o usuario inactivo")
+                st.error("Credenciales incorrectas")
     st.stop()
 
-# Logout + Info
 col1, col2 = st.columns([4,1])
 with col1:
-    st.success(f"Usuario: **{st.session_state.username.upper()}** • Rol: **{st.session_state.role.upper()}**")
+    st.success(f"**{st.session_state.username.upper()}** • {st.session_state.role.upper()}")
 with col2:
     if st.button("Salir"):
         for k in list(st.session_state.keys()):
             del st.session_state[k]
         st.rerun()
 
-st.markdown("---")
-
 # =============================================
-# FUNCIONES CLAVE
+# FUNCIONES
 # =============================================
 def get_risk_level(risk):
-    if risk > 70: return "MUY ALTO", "#CE1126", "Referir URGENTE a nefrólogo"
-    elif risk > 40: return "ALTO", "#FFC400", "Control estricto cada 3 meses"
-    else: return "MODERADO", "#4CAF50", "Control anual o bianual"
+    if risk > 70: return "MUY ALTO", "#EF4444", "Intervención urgente"
+    elif risk > 40: return "ALTO", "#F97316", "Intervención media"
+    else: return "MODERADO", "#10B981", "Sin intervención urgente"
 
 def predict_risk(row):
     features = np.array([[row["edad"], row["imc"], row["presion_sistolica"], row["glucosa_ayunas"], row["creatinina"]]])
     if model:
-        prob = model.predict_proba(features)[0][1]
-        return round(prob * 100, 1)
+        return round(model.predict_proba(features)[0][1] * 100, 1)
     else:
-        base = 10 + (row["creatinina"] - 1) * 35 + max(0, row["glucosa_ayunas"] - 126) * 0.3
-        return max(1, min(99, base + np.random.uniform(-10, 15)))
+        base = 15 + (row["creatinina"]-1)*30 + max(0, row["glucosa_ayunas"]-125)*0.25
+        return max(1, min(99, base + np.random.uniform(-8, 12)))
+
+def generate_pdf_html(patient_name, risk, nivel, doctor_name, data):
+    color = {"MUY ALTO": "#EF4444", "ALTO": "#F97316", "MODERADO": "#10B981"}[nivel]
+    return f"""
+    <!DOCTYPE html>
+    <html><head><style>
+        body {{font-family: Arial; margin: 40px; background: #f4f4f4;}}
+        .card {{background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); max-width: 800px; margin: auto;}}
+        .header {{background: #002868; color: white; padding: 20px; text-align: center; border-radius: 15px 15px 0 0; margin: -30px -30px 20px -30px;}}
+        .risk {{font-size: 4em; color: {color}; text-align: center;}}
+    </style></head><body>
+    <div class="card">
+        <div class="header"><h1>NefroPredict RD</h1><h3>Reporte de Riesgo ERC</h3></div>
+        <h2>Paciente: <strong>{patient_name}</strong></h2>
+        <p><strong>Médico:</strong> {doctor_name} • <strong>Fecha:</strong> {datetime.now().strftime("%d/%m/%Y %H:%M")}</p>
+        <h1 class="risk">{risk:.1f}% → {nivel}</h1>
+        <p><strong>Recomendación:</strong> {get_risk_level(risk)[2]}</p>
+        <hr>
+        <table width="100%"><tr><td><strong>Edad:</strong> {data['edad']}</td><td><strong>IMC:</strong> {data['imc']:.1f}</td></tr>
+        <tr><td><strong>Presión:</strong> {data['presion_sistolica']} mmHg</td><td><strong>Glucosa:</strong> {data['glucosa_ayunas']} mg/dL</td></tr>
+        <tr><td colspan="2"><strong>Creatinina:</strong> {data['creatinina']:.2f} mg/dL</td></tr></table>
+    </div>
+    </body></html>
+    """
 
 # =============================================
-# PESTAÑAS PRINCIPALES
+# PESTAÑAS
 # =============================================
-tab1, tab2, tab3 = st.tabs(["Predicción Individual", "Carga Masiva", "Historial Clínico"])
+tab1, tab2, tab3, tab4 = st.tabs(["Individual", "Carga Masiva", "Historial", "Admin"])
 
 with tab1:
-    st.subheader("Predicción Individual")
-    with st.form("individual"):
-        nombre = st.text_input("Nombre del paciente", "María Almonte")
-        c1, c2 = st.columns(2)
-        with c1:
+    st.subheader("Evaluación Individual")
+    with st.form("individual_form"):
+        nombre = st.text_input("Nombre del paciente")
+        col1, col2 = st.columns(2)
+        with col1:
             edad = st.number_input("Edad", 18, 120, 60)
-            imc = st.number_input("IMC", 10.0, 60.0, 30.0, 0.1)
-            glucosa = st.number_input("Glucosa ayunas", 50, 500, 180)
-        with c2:
-            presion = st.number_input("Presión sistólica", 80, 250, 160)
-            creat = st.number_input("Creatinina", 0.1, 10.0, 1.9, 0.01)
+            imc = st.number_input("IMC", 10.0, 60.0, 28.0, 0.1)
+            glucosa = st.number_input("Glucosa ayunas", 50, 500, 120)
+        with col2:
+            presion = st.number_input("Presión sistólica", 80, 250, 140)
+            creatinina = st.number_input("Creatinina", 0.1, 10.0, 1.5, 0.01)
+        submitted = st.form_submit_button("Calcular Riesgo")
+        if submitted and nombre:
+            row = {"edad": edad, "imc": imc, "presion_sistolica": presion, "glucosa_ayunas": glucosa, "creatinina": creatinina}
+            risk = predict_risk(row)
+            nivel, color, reco = get_risk_level(risk)
+            record = {"nombre_paciente": nombre, "user_id": st.session_state.user_id, "usuario": st.session_state.username,
+                      "timestamp": datetime.now().isoformat(), "risk": risk, "nivel": nivel, **row}
+            db.add_patient_record(record)
 
-        if st.form_submit_button("Calcular"):
-            if not nombre.strip():
-                st.error("El nombre es obligatorio")
-            else:
-                row = {"edad": edad, "imc": imc, "presion_sistolica": presion,
-                       "glucosa_ayunas": glucosa, "creatinina": creat}
-                risk = predict_risk(row)
-                nivel, color, reco = get_risk_level(risk)
+            st.markdown(f"<h2 style='color:{color}; text-align:center'>{nivel} • {risk:.1f}%</h2>", unsafe_allow_html=True)
+            if st.button("Descargar PDF"):
+                html = generate_pdf_html(nombre, risk, nivel, st.session_state.username, row)
+                st.download_button("Descargar Reporte PDF", html, f"Reporte_{nombre.replace(' ', '_')}.html", "text/html")
 
-                record = {
-                    "nombre_paciente": nombre,
-                    "user_id": st.session_state.user_id,
-                    "usuario": st.session_state.username,
-                    "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                    **row,
-                    "risk": risk,
-                    "nivel": nivel
-                }
-                db.add_patient_record(record)
+with tab2:
+    st.subheader("Carga Masiva (Excel)")
+    uploaded = st.file_uploader("Subir archivo Excel", type=["xlsx", "csv"])
+    if uploaded:
+        df = pd.read_excel(uploaded) if uploaded.name.endswith('.xlsx') else pd.read_csv(uploaded)
+        required = ["nombre_paciente", "edad", "imc", "presion_sistolica", "glucosa_ayunas", "creatinina"]
+        if all(c in df.columns for c in required):
+            df["risk"] = df.apply(predict_risk, axis=1)
+            df["nivel"], df["color"], df["recomendacion"] = zip(*df["risk"].apply(lambda x: get_risk_level(x)))
+            urgente = len(df[df["nivel"] == "MUY ALTO"])
+            media = len(df[df["nivel"] == "ALTO"])
+            baja = len(df) - urgente - media
 
-                st.session_state.last_risk = risk
-                st.session_state.last_nivel = nivel
-                st.session_state.last_color = color
-                st.session_state.last_reco = reco
-                st.rerun()
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Intervención Urgente", urgente, delta="Prioridad 1")
+            col2.metric("Intervención Media", media)
+            col3.metric("Sin Urgencia", baja)
 
-    if "last_risk" in st.session_state:
-        r = st.session_state.last_risk
-        n = st.session_state.last_nivel
-        c = st.session_state.last_color
-        reco = st.session_state.last_reco
+            st.dataframe(df[["nombre_paciente", "risk", "nivel", "recomendacion"]], use_container_width=True)
+            csv = df.to_csv(index=False).encode()
+            st.download_button("Descargar Resultados", csv, "resultados_grupal.csv", "text/csv")
 
-        st.markdown(f"""
-        <div style="text-align:center; padding:30px; background:#f9f9f9; border-radius:16px; border: 3px solid {c}">
-            <h2 style="color:{c}">{n}</h2>
-            <h1 style="font-size:5rem; margin:10px; color:{c}">{r:.1f}%</h1>
-            <div class="risk-gauge-bar"><div class="risk-gauge-marker" style="--pos: {r}%"></div></div>
-            <p style="font-size:1.2rem"><strong>Recomendación:</strong> {reco}</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-with tab3:
-    st.subheader("Historial de pacientes")
-    names = db.get_all_patient_names()
-    if names:
-        selected = st.selectbox("Seleccionar paciente", [""] + names)
-        if selected:
-            records = db.get_patient_records(selected)
-            df = pd.DataFrame(records)
-            st.dataframe(df[["timestamp", "risk", "nivel", "creatinina", "glucosa_ayunas"]], use_container_width=True)
-    else:
-        st.info("Aún no hay registros")
+            db.add_mass_upload({"user_id": st.session_state.user_id, "timestamp": datetime.now().isoformat(),
+                                "filename": uploaded.name, "total": len(df), "urgente": urgente})
+        else:
+            st.error("Faltan columnas obligatorias")
 
 # =============================================
-# PANEL DE ADMINISTRACIÓN (solo para admin)
+# ADMIN PANEL
 # =============================================
 if st.session_state.role == "admin":
-    st.markdown("---")
-    st.markdown("<h2 style='color:#CE1126;'>Panel de Administración</h2>", unsafe_allow_html=True)
+    with tab4:
+        st.markdown("### Panel Administrativo")
+        tab_a, tab_b, tab_c = st.tabs(["Doctores", "Estadísticas", "Crear Usuario"])
 
-    tab_usuarios, tab_log = st.tabs(["Gestión de Doctores", "Historial Global"])
+        with tab_a:
+            users = db._load()["users"]
+            doctores = {k: v for k, v in users.items() if v["role"] == "doctor"}
+            df_docs = pd.DataFrame([
+                {"Usuario": k, "Contraseña": v["pwd"], "Estado": "Activo" if v.get("active", True) else "Inactivo"}
+                for k, v in doctores.items()
+            ])
+            st.dataframe(df_docs, use_container_width=True)
 
-    with tab_usuarios:
-        st.markdown("### Crear Nuevo Doctor")
-        with st.form("nuevo_doctor_form"):
-            nuevo_user = st.text_input("Nombre de usuario (ej: dr.martinez)").lower().strip()
-            nuevo_pwd = st.text_input("Contraseña inicial", type="password")
-            submit_nuevo = st.form_submit_button("Crear Doctor")
-
-            if submit_nuevo:
-                if not nuevo_user or not nuevo_pwd:
-                    st.error("Todos los campos son obligatorios")
-                elif db.get_user(nuevo_user):
-                    st.error("Ese usuario ya existe")
-                else:
-                    nuevo_id = f"dr_{int(time.time())}_{nuevo_user.split('.')[-1] if '.' in nuevo_user else nuevo_user}"
-                    data = db._load()
-                    data["users"][nuevo_user] = {
-                        "pwd": nuevo_pwd,
-                        "role": "doctor",
-                        "id": nuevo_id,
-                        "active": True
-                    }
-                    db._save(data)
-                    st.success(f"Doctor **{nuevo_user}** creado correctamente")
+            with st.expander("Modificar Doctor"):
+                doc = st.selectbox("Seleccionar", list(doctores.keys()))
+                nueva_pwd = st.text_input("Nueva contraseña", type="password")
+                if st.button("Cambiar contraseña"):
+                    db.update_user(doc, {"pwd": nueva_pwd})
+                    st.success("Contraseña actualizada")
+                if st.button("Eliminar doctor", type="primary"):
+                    db.delete_user(doc)
+                    st.success("Eliminado")
                     st.rerun()
 
-        st.markdown("### Lista de Doctores")
-        users_data = db._load()["users"]
-        doctores = {k: v for k, v in users_data.items() if v["role"] == "doctor"}
+        with tab_b:
+            uploads = db._load().get("mass_uploads", [])
+            df_usage = pd.DataFrame(uploads)
+            if not df_usage.empty:
+                ranking = df_usage["user_id"].value_counts().reset_index()
+                ranking.columns = ["user_id", "cargas"]
+                ranking = ranking.merge(pd.DataFrame([(u["id"], k) for k, u in users.items() if u["role"]=="doctor"],
+                                                    columns=["user_id", "usuario"]), on="user_id", how="left")
+                st.bar_chart(ranking.set_index("usuario")["cargas"])
 
-        if doctores:
-            df_doctores = pd.DataFrame([
-                {"Usuario": user, "ID": data["id"], "Estado": "Activo" if data.get("active", True) else "Inactivo"}
-                for user, data in doctores.items()
-            ])
-            st.dataframe(df_doctores, use_container_width=True, hide_index=True)
-
-            st.markdown("#### Cambiar estado o eliminar")
-            col1, col2 = st.columns(2)
-            with col1:
-                doctor_seleccionado = st.selectbox("Seleccionar doctor", options=[""] + list(doctores.keys()))
-            with col2:
-                if doctor_seleccionado:
-                    actual = doctores[doctor_seleccionado]
-                    nuevo_estado = not actual.get("active", True)
-                    estado_texto = "Desactivar" if actual.get("active", True) else "Activar"
-
-                    if st.button(f"{estado_texto} cuenta", key=f"toggle_{doctor_seleccionado}"):
-                        db.update_user(doctor_seleccionado, {"active": nuevo_estado})
-                        st.success(f"Cuenta de **{doctor_seleccionado}** {estado_texto.lower()}da")
+        with tab_c:
+            with st.form("nuevo_doc"):
+                nuevo = st.text_input("Usuario nuevo")
+                pwd = st.text_input("Contraseña", type="password")
+                if st.form_submit_button("Crear"):
+                    if db.get_user(nuevo):
+                        st.error("Ya existe")
+                    else:
+                        db._load()["users"][nuevo] = {"pwd": pwd, "role": "doctor", "id": f"dr_{int(time.time())}", "active": True}
+                        db._save(db._load())
+                        st.success("Creado!")
                         st.rerun()
 
-                    if st.button("Eliminar permanentemente", key=f"delete_{doctor_seleccionado}", type="primary"):
-                        if st.checkbox(f"Confirmar eliminación de **{doctor_seleccionado}** (no se puede deshacer)", key=f"confirm_{doctor_seleccionado}"):
-                            if db.delete_user(doctor_seleccionado):
-                                st.success(f"Doctor **{doctor_seleccionado}** eliminado del sistema")
-                                st.rerun()
-        else:
-            st.info("Aún no hay doctores registrados")
-
-    with tab_log:
-        st.info("Aquí aparecerá el historial de cargas masivas de todos los usuarios (próximamente)")
-
-st.caption("NefroPredict RD © 2025 • Versión completa con gestión de usuarios")
+st.caption("NefroPredict RD © 2025 • Confidencialidad garantizada • Solo admin ve todo")
