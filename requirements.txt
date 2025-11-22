@@ -4,3 +4,4 @@ numpy
 openpyxl
 joblib
 scikit-learn
+plotly
