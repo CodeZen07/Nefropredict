@@ -3,77 +3,104 @@ import pandas as pd
 import numpy as np
 import time
 import joblib 
+import json
+import os
 
-# --- CONFIGURACIÓN DE LA PÁGINA Y ESTADO INICIAL ---
+# --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="NefroPredict RD", page_icon="🫘", layout="wide")
 
-# --- 0. Inicialización de Sesión y Datos Simulación ---
+# --- 0. CLASE DE PERSISTENCIA SIMULADA (REEMPLAZO DE FIRESTORE) ---
+# Esta clase simula la conexión y las operaciones CRUD de Firestore.
+# Usamos un archivo JSON local para que los datos persistan entre interacciones de Streamlit.
 
-# Inicialización de la Session State para persistencia temporal (simulando Firestore)
-if 'MOCK_USERS' not in st.session_state:
-    st.session_state.MOCK_USERS = {
-        # 'active': True por defecto. Lo usamos para la gestión de cuentas.
-        "admin": {"pwd": "admin", "role": "admin", "id": "admin_nefro", "active": True},
-        "dr.perez": {"pwd": "pass1", "role": "doctor", "id": "dr_perez_uid_001", "active": True},
-        "dr.gomez": {"pwd": "pass2", "role": "doctor", "id": "dr_gomez_uid_002", "active": True},
-        "dr.sanchez": {"pwd": "pass3", "role": "doctor", "id": "dr_sanchez_uid_003", "active": False}, # Cuenta inactiva de prueba
-    }
+DB_FILE_PATH = "nefro_db.json"
 
-if 'MOCK_HISTORY' not in st.session_state:
-    # Historial de archivos simulado por usuario.
-    st.session_state.MOCK_HISTORY = {
-        "admin_nefro": [
-            {"usuario": "admin", "timestamp": "2025-05-01 10:00", "filename": "Test_Global.xlsx", "patients": 100},
-        ],
-        "dr_perez_uid_001": [
-            {"usuario": "dr.perez", "timestamp": "2025-05-02 14:30", "filename": "Mis_Pacientes_Q1_2025.xlsx", "patients": 55},
-            {"usuario": "dr.perez", "timestamp": "2025-05-03 09:15", "filename": "Consulta_Semanal.xlsx", "patients": 12},
-        ],
-        "dr_gomez_uid_002": [
-            {"usuario": "dr.gomez", "timestamp": "2025-05-01 11:00", "filename": "Pacientes_HTA.xlsx", "patients": 80},
-            {"usuario": "dr.gomez", "timestamp": "2025-05-01 16:00", "filename": "Revision_Mensual.xlsx", "patients": 20},
-        ]
-    }
+class DataStore:
+    def __init__(self, file_path):
+        self.file_path = file_path
+        self._initialize_db()
 
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
-    st.session_state.user_id = None
-    st.session_state.user_role = None
-    st.session_state.username = None
+    def _initialize_db(self):
+        """Crea el archivo DB con datos iniciales si no existe."""
+        if not os.path.exists(self.file_path):
+            initial_data = {
+                # Datos de usuarios (simulando una colección 'doctors' o 'users')
+                "users": {
+                    "admin": {"pwd": "admin", "role": "admin", "id": "admin_nefro", "active": True},
+                    "dr.perez": {"pwd": "pass1", "role": "doctor", "id": "dr_perez_uid_001", "active": True},
+                    "dr.gomez": {"pwd": "pass2", "role": "doctor", "id": "dr_gomez_uid_002", "active": True},
+                    "dr.sanchez": {"pwd": "pass3", "role": "doctor", "id": "dr_sanchez_uid_003", "active": False},
+                },
+                # Historial de archivos subidos (simulando una colección 'file_history' pública)
+                "file_history": [
+                    {"usuario": "dr.perez", "user_id": "dr_perez_uid_001", "timestamp": "2025-05-02 14:30", "filename": "Mis_Pacientes_Q1_2025.xlsx", "patients": 55},
+                    {"usuario": "dr.gomez", "user_id": "dr_gomez_uid_002", "timestamp": "2025-05-01 11:00", "filename": "Pacientes_HTA.xlsx", "patients": 80},
+                    {"usuario": "dr.gomez", "user_id": "dr_gomez_uid_002", "timestamp": "2025-05-01 16:00", "filename": "Revision_Mensual.xlsx", "patients": 20},
+                ]
+            }
+            self._write_db(initial_data)
 
+    def _read_db(self):
+        """Lee todos los datos del archivo DB."""
+        if not os.path.exists(self.file_path):
+            self._initialize_db()
+        with open(self.file_path, 'r') as f:
+            return json.load(f)
 
-# --- 1. Funciones de Acceso a Datos (Simulación de DB) ---
+    def _write_db(self, data):
+        """Escribe todos los datos al archivo DB."""
+        with open(self.file_path, 'w') as f:
+            json.dump(data, f, indent=4)
 
-def create_new_user(username, password):
-    """Simula la creación de un nuevo usuario en la DB."""
-    if username in st.session_state.MOCK_USERS:
-        return False, "Ese nombre de usuario ya existe."
-    
-    user_id = f"dr_{username}_uid_{len(st.session_state.MOCK_USERS) + 1}"
-    # Guardar en Session State
-    st.session_state.MOCK_USERS[username] = {"pwd": password, "role": "doctor", "id": user_id, "active": True}
-    st.session_state.MOCK_HISTORY[user_id] = []
-    return True, f"Médico '{username}' creado con éxito (ID: {user_id})."
+    def get_user(self, username):
+        """Obtiene un usuario por nombre de usuario."""
+        db = self._read_db()
+        return db['users'].get(username)
 
-def update_user_status(username, is_active):
-    """Simula la activación/desactivación de un usuario en la DB."""
-    if username in st.session_state.MOCK_USERS and st.session_state.MOCK_USERS[username]['role'] == 'doctor':
-        st.session_state.MOCK_USERS[username]['active'] = is_active
-        return True
-    return False
+    def get_all_users(self):
+        """Obtiene todos los usuarios."""
+        db = self._read_db()
+        return db['users']
 
-def get_doctors():
-    """Obtiene la lista de todos los médicos (no admin)."""
-    return {k: v for k, v in st.session_state.MOCK_USERS.items() if v['role'] == 'doctor'}
+    def create_user(self, username, user_data):
+        """Crea un nuevo usuario."""
+        db = self._read_db()
+        db['users'][username] = user_data
+        self._write_db(db)
 
-def get_global_history():
-    """Obtiene y combina el historial de todos los usuarios."""
-    all_records = []
-    for user_id, history_list in st.session_state.MOCK_HISTORY.items():
-        all_records.extend(history_list)
-    if all_records:
-        return pd.DataFrame(all_records)
-    return pd.DataFrame()
+    def update_user(self, username, updates):
+        """Actualiza campos de un usuario (ej: 'active')."""
+        db = self._read_db()
+        if username in db['users']:
+            db['users'][username].update(updates)
+            self._write_db(db)
+            return True
+        return False
+
+    def get_file_history(self):
+        """Obtiene todo el historial de archivos subidos."""
+        db = self._read_db()
+        return db['file_history']
+
+    def add_file_record(self, record):
+        """Añade un nuevo registro de archivo al historial."""
+        db = self._read_db()
+        db['file_history'].insert(0, record) # Insertar al inicio para que el más reciente salga primero
+        self._write_db(db)
+
+# Inicializamos el DataStore (simulando la conexión a Firestore)
+db_store = DataStore(DB_FILE_PATH)
+
+# --- 1. CONFIGURACIÓN DEL ENTORNO (Globales de Firebase) ---
+# Aunque no usamos el SDK de Firebase en Python, estos placeholders simulan
+# las variables que el entorno Canvas proveería si se usara el SDK JS.
+
+# const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+# const firebaseConfig = JSON.parse(__firebase_config);
+# const auth = getAuth(db);
+# if (typeof __initial_auth_token !== 'undefined') { await signInWithCustomToken(auth, __initial_auth_token); } else { await signInAnonymously(auth); }
+
+# st.info("Estructura lista para Firebase. Actualmente usando persistencia local (nefro_db.json).")
 
 
 # --- 2. Título y Branding ---
@@ -81,7 +108,7 @@ st.markdown("<h1 style='text-align: center; color:#002868;'>🫘 NefroPredict RD
 st.markdown("<h3 style='text-align: center;'>Detección temprana de enfermedad renal crónica</h3>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color:#CE1126; font-size:1.1em;'>República Dominicana 🇩🇴</p>", unsafe_allow_html=True)
 
-# --- FUNCIÓN DE CARGA DE MODELO (Mantener para referencia) ---
+# --- FUNCIÓN DE CARGA DE MODELO ---
 @st.cache_resource
 def load_model(path):
     try:
@@ -96,10 +123,16 @@ nefro_model = load_model('modelo_erc.joblib')
 model_loaded = nefro_model is not None
 
 
-# --- 3. SISTEMA DE AUTENTICACIÓN Y ROLES ---
+# --- 3. SISTEMA DE AUTENTICACIÓN Y ROLES (Ahora usa DataStore) ---
+
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+    st.session_state.user_id = None
+    st.session_state.user_role = None
+    st.session_state.username = None
 
 def check_login():
-    """Maneja el flujo de login y verifica el estado 'active'."""
+    """Maneja el flujo de login usando DataStore (simulación Firestore)."""
     if not st.session_state.logged_in:
         st.markdown("### 🔐 Acceso de Usuario")
         
@@ -110,15 +143,17 @@ def check_login():
             submitted = st.form_submit_button("Ingresar")
 
             if submitted:
-                if user in st.session_state.MOCK_USERS and st.session_state.MOCK_USERS[user]['pwd'] == pwd:
-                    user_data = st.session_state.MOCK_USERS[user]
+                # 1. Buscar usuario en DataStore
+                user_data = db_store.get_user(user)
+
+                if user_data and user_data['pwd'] == pwd:
                     
-                    # Verificar si la cuenta está activa
+                    # 2. Verificar si la cuenta está activa
                     if not user_data.get('active', True):
                         st.error("Tu cuenta ha sido desactivada. Por favor, contacta al administrador.")
                         return False
 
-                    # Login exitoso
+                    # 3. Login exitoso
                     st.session_state.logged_in = True
                     st.session_state.user_id = user_data['id']
                     st.session_state.user_role = user_data['role']
@@ -138,9 +173,11 @@ if not check_login():
     
 # Mostrar información de sesión y botón de Logout
 col_user, col_logout = st.columns([4, 1])
+current_user_data = db_store.get_user(st.session_state.username)
+current_status = "Activo" if current_user_data.get('active', True) else "INACTIVO"
+
 with col_user:
-    status = "Activo" if st.session_state.MOCK_USERS[st.session_state.username].get('active', True) else "INACTIVO"
-    st.success(f"✅ Sesión activa | Usuario: **{st.session_state.username}** | Rol: **{st.session_state.user_role.capitalize()}** | Estado: **{status}**")
+    st.success(f"✅ Sesión activa | Usuario: **{st.session_state.username}** | Rol: **{st.session_state.user_role.capitalize()}** | Estado: **{current_status}**")
 with col_logout:
     if st.button("Cerrar Sesión"):
         st.session_state.logged_in = False
@@ -150,6 +187,36 @@ with col_logout:
         st.rerun()
 
 st.markdown("---")
+
+
+# --- 4. FUNCIONES DE GESTIÓN (Ahora usan DataStore) ---
+
+def create_new_user_db(username, password):
+    """Crea un nuevo usuario en la DB (DataStore)."""
+    if db_store.get_user(username):
+        return False, "Ese nombre de usuario ya existe."
+    
+    user_id = f"dr_{username}_uid_{int(time.time())}"
+    user_data = {"pwd": password, "role": "doctor", "id": user_id, "active": True}
+    db_store.create_user(username, user_data)
+    return True, f"Médico '{username}' creado con éxito (ID: {user_id})."
+
+def update_user_status_db(username, is_active):
+    """Actualiza el estado 'active' de un usuario en la DB (DataStore)."""
+    user_data = db_store.get_user(username)
+    if user_data and user_data['role'] == 'doctor':
+        return db_store.update_user(username, {'active': is_active})
+    return False
+
+def get_doctors_db():
+    """Obtiene la lista de todos los médicos (no admin) de la DB."""
+    all_users = db_store.get_all_users()
+    return {k: v for k, v in all_users.items() if v['role'] == 'doctor'}
+
+def get_global_history_db():
+    """Obtiene todo el historial de archivos de la DB."""
+    return db_store.get_file_history()
+
 
 # --- PANEL DE ADMINISTRACIÓN (SOLO PARA ADMIN) ---
 if st.session_state.user_role == 'admin':
@@ -161,7 +228,7 @@ if st.session_state.user_role == 'admin':
     with tab_dashboard:
         st.markdown("#### 📊 Dashboard de Uso (KPIs)")
         
-        df_history = get_global_history()
+        df_history = pd.DataFrame(get_global_history_db())
         
         if not df_history.empty:
             
@@ -175,7 +242,7 @@ if st.session_state.user_role == 'admin':
             col_kpi2.metric("Archivos Totales Procesados", total_files)
             
             # Conteo de Médicos Activos/Inactivos
-            all_doctors = get_doctors()
+            all_doctors = get_doctors_db()
             active_doctors = sum(1 for d in all_doctors.values() if d.get('active', True))
             inactive_doctors = len(all_doctors) - active_doctors
             col_kpi3.metric("Médicos Activos", active_doctors, delta=-inactive_doctors, delta_color="inverse")
@@ -196,14 +263,14 @@ if st.session_state.user_role == 'admin':
         
         with col_add:
             st.markdown("#### ➕ Crear Nuevo Médico")
-            st.info("Nota: Estos cambios son persistentes mientras la sesión de Streamlit esté activa.")
+            st.info("Nota: Estos cambios se guardan de forma persistente en el archivo `nefro_db.json`.")
             
             # Formulario para añadir médico
             new_user = st.text_input("Nombre de Usuario del Nuevo Médico", key="new_user_input")
             new_pwd = st.text_input("Contraseña Temporal", type="password", key="new_pwd_input")
             if st.button("Crear Médico y Acceso"):
                 if new_user and new_pwd:
-                    success, message = create_new_user(new_user.lower(), new_pwd)
+                    success, message = create_new_user_db(new_user.lower(), new_pwd)
                     if success:
                         st.success(message)
                         st.rerun()
@@ -214,7 +281,7 @@ if st.session_state.user_role == 'admin':
                     
         with col_list:
             st.markdown("#### 📋 Listado de Médicos")
-            doctors = get_doctors()
+            doctors = get_doctors_db()
             
             if doctors:
                 doctor_list = [{"Usuario": user, "ID de Sistema": details['id'], "Estado": "✅ Activo" if details.get('active', True) else "🚫 Inactivo"} for user, details in doctors.items()]
@@ -228,26 +295,33 @@ if st.session_state.user_role == 'admin':
             
             # Lógica para suspender/activar
             if doctors:
-                user_to_manage = st.selectbox("Selecciona un Médico para Gestionar", sorted(list(doctors.keys())), key="user_to_manage")
-                current_status = doctors[user_to_manage].get('active', True)
-                
-                # Usamos el estado actual para la selección inicial
-                default_index = 0 if current_status else 1 
-                
-                new_status = st.radio(
-                    "Estado de la Cuenta", 
-                    ["Activo", "Inactivo"], 
-                    index=default_index,
-                    key="status_radio"
-                )
-                
-                if st.button("Aplicar Cambio de Estado"):
-                    is_active = (new_status == "Activo")
-                    if update_user_status(user_to_manage, is_active):
-                        st.success(f"Estado de '{user_to_manage}' actualizado a: {new_status}")
-                        st.rerun()
-                    else:
-                        st.error("Error al actualizar el estado del usuario.")
+                # Excluir al admin de la gestión
+                doctor_names = sorted([k for k, v in doctors.items() if v['role'] == 'doctor'])
+                if not doctor_names:
+                    st.info("No hay médicos para gestionar.")
+                else:
+                    user_to_manage = st.selectbox("Selecciona un Médico para Gestionar", doctor_names, key="user_to_manage")
+                    
+                    # Cargar el estado actual del médico seleccionado
+                    selected_doctor_data = db_store.get_user(user_to_manage)
+                    current_status_bool = selected_doctor_data.get('active', True)
+                    
+                    default_index = 0 if current_status_bool else 1 
+                    
+                    new_status = st.radio(
+                        "Estado de la Cuenta", 
+                        ["Activo", "Inactivo"], 
+                        index=default_index,
+                        key="status_radio"
+                    )
+                    
+                    if st.button("Aplicar Cambio de Estado"):
+                        is_active = (new_status == "Activo")
+                        if update_user_status_db(user_to_manage, is_active):
+                            st.success(f"Estado de '{user_to_manage}' actualizado a: {new_status}")
+                            st.rerun()
+                        else:
+                            st.error("Error al actualizar el estado del usuario.")
             else:
                 st.info("No hay médicos para gestionar.")
 
@@ -255,12 +329,11 @@ if st.session_state.user_role == 'admin':
     # --- TAB 3: HISTORIAL GLOBAL DE ARCHIVOS ---
     with tab_files:
         st.markdown("#### 📁 Archivos Subidos por Todos los Médicos")
-        st.info("Vista global de auditoría de uso de la plataforma.")
+        st.info("Vista global de auditoría de uso de la plataforma. (Datos obtenidos de la 'Colección Pública').")
         
-        all_history_df = get_global_history()
+        all_history_df = pd.DataFrame(get_global_history_db())
         
         if not all_history_df.empty:
-            # Asegurar que el usuario y la marca de tiempo estén presentes
             cols = ['usuario', 'timestamp', 'filename', 'patients']
             display_df = all_history_df[cols].sort_values(by='timestamp', ascending=False)
             st.dataframe(display_df, use_container_width=True, hide_index=True)
@@ -288,46 +361,39 @@ def generate_explanation_data(row):
     imc = row.get('imc', 25.0) # Alto riesgo si > 30
 
     # Lógica de Contribución:
-    
-    # 1. Creatinina (El factor más fuerte)
     if creatinina > 2.0:
-        contributions['Creatinina'] = 0.40 # Muy Alta
+        contributions['Creatinina'] = 0.40
     elif creatinina > 1.3:
-        contributions['Creatinina'] = 0.25 # Alta
+        contributions['Creatinina'] = 0.25
     else:
-        contributions['Creatinina'] = -0.10 # Baja el riesgo
+        contributions['Creatinina'] = -0.10
     
-    # 2. Glucosa en Ayunas
     if glucosa > 125:
-        contributions['Glucosa Ayunas'] = 0.20 # Alta
+        contributions['Glucosa Ayunas'] = 0.20
     elif glucosa > 100:
-        contributions['Glucosa Ayunas'] = 0.05 # Media
+        contributions['Glucosa Ayunas'] = 0.05
     else:
-        contributions['Glucosa Ayunas'] = -0.05 # Baja el riesgo
+        contributions['Glucosa Ayunas'] = -0.05
 
-    # 3. Presión Sistólica
     if presion > 140:
-        contributions['Presión Sistólica'] = 0.15 # Alta
+        contributions['Presión Sistólica'] = 0.15
     elif presion > 130:
-        contributions['Presión Sistólica'] = 0.05 # Media
+        contributions['Presión Sistólica'] = 0.05
     else:
-        contributions['Presión Sistólica'] = -0.05 # Baja el riesgo
+        contributions['Presión Sistólica'] = -0.05
         
-    # 4. Edad
     if edad > 65:
-        contributions['Edad'] = 0.10 # Media
+        contributions['Edad'] = 0.10
     else:
-        contributions['Edad'] = -0.03 # Baja el riesgo
+        contributions['Edad'] = -0.03
 
-    # 5. IMC
     if imc > 30.0:
-        contributions['IMC (Obesidad)'] = 0.08 # Media
+        contributions['IMC (Obesidad)'] = 0.08
     elif imc < 18.5:
-        contributions['IMC (Bajo Peso)'] = 0.03 # Baja
+        contributions['IMC (Bajo Peso)'] = 0.03
     else:
-        contributions['IMC'] = -0.02 # Baja el riesgo (peso normal)
+        contributions['IMC'] = -0.02
 
-    # Normalizar para que la suma absoluta no exceda un valor razonable (esto es solo visual)
     total_abs = sum(abs(v) for v in contributions.values())
     if total_abs > 0:
         contributions = {k: v / total_abs for k, v in contributions.items()}
@@ -337,7 +403,6 @@ def generate_explanation_data(row):
 def display_explanation(data):
     """Muestra los datos de contribución como un gráfico de barras horizontal."""
     
-    # Estilos CSS para las barras
     style = """
     <style>
         .contribution-bar-container {
@@ -366,10 +431,8 @@ def display_explanation(data):
     """
     st.markdown(style, unsafe_allow_html=True)
     
-    # Calcular el rango máximo para escalar las barras (simulando el eje central)
     max_val = max(abs(v) for v in data.values()) * 1.2
     
-    # Renderizar cada barra
     for feature, contribution in data.items():
         width_percent = (abs(contribution) / max_val) * 50
         
@@ -382,7 +445,6 @@ def display_explanation(data):
             position = f"right: 50%; width: {width_percent}%;"
             icon = "🔻"
         
-        # HTML para la barra
         bar_html = f"""
         <div class="contribution-bar-container">
             <div class="contribution-label">{feature}</div>
@@ -399,7 +461,7 @@ def display_explanation(data):
 # -----------------------------------------------
 
 
-# --- 4. Carga de Datos y Procesamiento ---
+# --- 5. Carga de Datos y Procesamiento ---
 st.subheader("1. Carga de datos de pacientes")
 uploaded = st.file_uploader("📁 Sube tu archivo Excel de pacientes", type=["xlsx", "xls"])
 
@@ -408,7 +470,6 @@ if uploaded:
         df = pd.read_excel(uploaded)
         st.success(f"¡Cargados {len(df)} pacientes correctamente!")
 
-        # ... (rest of the processing logic)
         required_cols = ['edad', 'imc', 'presion_sistolica', 'glucosa_ayunas', 'creatinina']
         missing_cols = [col for col in required_cols if col not in df.columns]
 
@@ -416,39 +477,32 @@ if uploaded:
              st.error(f"⚠️ Error: Faltan las siguientes columnas requeridas en tu Excel: {', '.join(missing_cols)}. Por favor, revisa el formato.")
              st.stop()
         
-        # Seleccionar las características necesarias para el modelo
         X = df[required_cols]
 
-        # --- LÓGICA DE PREDICCIÓN REAL O SIMULACIÓN ---
+        # LÓGICA DE PREDICCIÓN
         if model_loaded:
-            st.info(f"Usando el modelo cargado para predicción real: {type(nefro_model).__name__}")
             predictions_proba = nefro_model.predict_proba(X)[:, 1]
             df['Riesgo_ERC_5años_%'] = (predictions_proba * 100).round(1)
         else:
-            st.warning("Usando simulación de riesgo: El modelo real no pudo cargarse.")
             np.random.seed(42)
             df['Riesgo_ERC_5años_%'] = np.random.uniform(10, 95, len(df)).round(1)
-        # -----------------------------------------------
 
-        # --- 5. Presentación de Resultados ---
-        st.subheader("2. Resultados predictivos y recomendaciones")
-
-        # Registro del archivo subido en el historial (simulando guardado)
+        # --- REGISTRO DE ARCHIVO EN DB (Persistencia real) ---
         now = time.strftime("%Y-%m-%d %H:%M:%S")
         record = {
             "usuario": st.session_state.username,
+            "user_id": st.session_state.user_id,
             "timestamp": now,
             "filename": uploaded.name,
             "patients": len(df)
         }
-        
-        # Agregar al historial del usuario actual
-        if st.session_state.user_id not in st.session_state.MOCK_HISTORY:
-            st.session_state.MOCK_HISTORY[st.session_state.user_id] = []
-        
-        st.session_state.MOCK_HISTORY[st.session_state.user_id].insert(0, record)
+        # Usa la función de la capa de persistencia simulada
+        db_store.add_file_record(record)
+        # -----------------------------------------------------
 
-        # Métricas de resumen general
+        # --- 6. Presentación de Resultados ---
+        st.subheader("2. Resultados predictivos y recomendaciones")
+
         total_alto_riesgo = len(df[df['Riesgo_ERC_5años_%'] > 70])
         total_pacientes = len(df)
         
@@ -464,7 +518,6 @@ if uploaded:
             riesgo = row['Riesgo_ERC_5años_%']
             paciente_id = row.get('id_paciente', f'Paciente {i+1}')
             
-            # Determinación del nivel de riesgo y estilo
             if riesgo > 70:
                 color_bg, color_txt, nivel = "#CE1126", "white", "MUY ALTO - Referir URGENTE a nefrólogo" # Rojo RD
                 emoji = "🚨"
@@ -475,7 +528,6 @@ if uploaded:
                 color_bg, color_txt, nivel = "#4CAF50", "white", "MODERADO - Control anual" # Verde
                 emoji = "✅"
 
-            # Personalización del Expander usando HTML para el color de fondo del encabezado
             expander_html = f"""
             <style>
                 div[data-testid="stExpander"] > div[role="button"] {{
@@ -491,10 +543,8 @@ if uploaded:
             st.markdown(expander_html, unsafe_allow_html=True)
 
             with st.expander(f"{emoji} **{paciente_id}** | Riesgo: **{riesgo}%**"):
-                # Mostrar el detalle de los biomarcadores
                 st.markdown(f"#### Nivel de Riesgo: {nivel.split(' - ')[0]} ({riesgo:.1f}%)")
                 
-                # Biomatricadores actuales
                 col1, col2, col3, col4 = st.columns(4)
                 col1.metric("Creatinina (mg/dL)", f"{row.get('creatinina', 'N/D')}", help="Indicador clave de función renal.")
                 col2.metric("Glucosa Ayunas (mg/dL)", f"{row.get('glucosa_ayunas', 'N/D')}", help="Factor de riesgo de diabetes.")
@@ -503,18 +553,16 @@ if uploaded:
                 
                 st.markdown("---")
 
-                # Interpretación del Modelo (SHAP SIMULADO)
                 st.subheader("Análisis de Contribución al Riesgo")
                 st.markdown("<p style='font-size: 0.9em; color: #666;'>El riesgo es el resultado de la combinación de estos factores en el paciente:</p>", unsafe_allow_html=True)
                 explanation_data = generate_explanation_data(row)
                 display_explanation(explanation_data)
 
-                # Recomendación final
                 st.markdown(f"<div style='padding: 15px; border-left: 5px solid {color_bg}; background-color: #f0f2f6; border-radius: 5px; margin-top: 20px;'>**RECOMENDACIÓN MÉDICA:** {nivel}</div>", unsafe_allow_html=True)
         
         st.markdown("---")
 
-        # --- 6. Descarga de resultados ---
+        # --- 7. Descarga de resultados ---
         st.subheader("3. Exportar Datos")
         csv = df.to_csv(index=False).encode('utf-8')
         st.download_button(
@@ -536,20 +584,26 @@ else:
         st.warning("🚨 ADVERTENCIA: La aplicación está en modo **SIMULACIÓN** (el modelo real no se pudo cargar).")
 
 
-# --- 7. Historial de Archivos (Aislamiento) ---
+# --- 8. Historial de Archivos (Aislamiento) ---
 st.markdown("---")
 st.subheader("Historial de Archivos del Usuario Actual")
 st.info(f"Solo se muestra el historial asociado a tu ID: **{st.session_state.user_id}**")
 
-current_history = st.session_state.MOCK_HISTORY.get(st.session_state.user_id, [])
+# Filtrar el historial global para el usuario actual
+global_history = db_store.get_file_history()
+current_user_history = [
+    record for record in global_history 
+    if record.get('user_id') == st.session_state.user_id
+]
 
-if current_history:
-    history_df = pd.DataFrame(current_history)
+if current_user_history:
+    history_df = pd.DataFrame(current_user_history)
     st.dataframe(history_df, use_container_width=True, hide_index=True)
-    st.caption("Esta información estaría guardada en Firestore bajo una ruta exclusiva para tu ID (`/users/{tu_id}/archivos`).")
+    st.caption("Esta información es persistente. En Firebase, se leería de tu ruta de usuario.")
 else:
     st.info("No has subido ningún archivo aún.")
 
-# --- 8. Footer ---
+# --- 9. Footer ---
 st.markdown("---")
 st.markdown("<p style='text-align: center; color:#002868; font-weight:bold;'>© 2025 NefroPredict RD - Soluciones de salud impulsadas por IA</p>", unsafe_allow_html=True)
+          
