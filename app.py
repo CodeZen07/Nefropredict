@@ -661,49 +661,279 @@ with tab2:
                 )
                 
                 if filtro_cat == "🔴 Críticos":
-                    df_mostrar = criticos
+                    df_mostrar = criticos.copy()
                 elif filtro_cat == "🟡 Riesgo Medio":
-                    df_mostrar = medios
+                    df_mostrar = medios.copy()
                 elif filtro_cat == "🟢 Normales":
-                    df_mostrar = normales
+                    df_mostrar = normales.copy()
                 else:
-                    df_mostrar = df
+                    df_mostrar = df.copy()
                 
                 if len(df_mostrar) > 0:
-                    # Función para colorear filas
-                    def colorear_fila(row):
-                        if row["riesgo"] > 70:
-                            return ['background-color: #ffe5e5'] * len(row)
-                        elif row["riesgo"] > 40:
-                            return ['background-color: #fff4e5'] * len(row)
-                        else:
-                            return ['background-color: #e5f7e5'] * len(row)
-                    
-                    # Función para marcar campos vacíos en rojo
-                    def marcar_vacios(row):
-                        styles = [''] * len(row)
-                        campos_vacios = str(row.get("campos_vacios", "")).split(", ")
-                        for i, col in enumerate(row.index):
-                            if col in campos_vacios and col != "campos_vacios":
-                                styles[i] = 'background-color: #ffcccc; color: red; font-weight: bold;'
-                        return styles
-                    
+                    # Preparar dataframe para mostrar
                     columnas_mostrar = ["nombre_paciente", "edad", "imc", "presion_sistolica", 
-                                       "glucosa_ayunas", "creatinina", "riesgo", "nivel", "campos_vacios"]
+                                       "glucosa_ayunas", "creatinina", "riesgo", "nivel"]
                     columnas_disponibles = [c for c in columnas_mostrar if c in df_mostrar.columns]
                     
-                    df_styled = df_mostrar[columnas_disponibles].style.apply(colorear_fila, axis=1)
+                    df_display = df_mostrar[columnas_disponibles].copy()
+                    df_display.columns = ["Paciente", "Edad", "IMC", "Presión Sist.", "Glucosa", "Creatinina", "Riesgo %", "Nivel"]
                     
-                    st.dataframe(df_styled, use_container_width=True, hide_index=True, height=400)
+                    # Ordenar por riesgo descendente
+                    df_display = df_display.sort_values("Riesgo %", ascending=False)
+                    
+                    # Mostrar tabla con colores más intensos
+                    st.markdown("""
+                    <style>
+                    .tabla-riesgo {
+                        width: 100%;
+                        border-collapse: collapse;
+                        font-family: 'Segoe UI', Arial, sans-serif;
+                        font-size: 14px;
+                        margin: 20px 0;
+                    }
+                    .tabla-riesgo th {
+                        background: #002868;
+                        color: white;
+                        padding: 12px 15px;
+                        text-align: left;
+                        font-weight: 600;
+                        border: 1px solid #001a4d;
+                    }
+                    .tabla-riesgo td {
+                        padding: 10px 15px;
+                        border: 1px solid #ddd;
+                    }
+                    .fila-critico {
+                        background: #f8d7da !important;
+                        color: #721c24 !important;
+                        font-weight: 600;
+                    }
+                    .fila-medio {
+                        background: #fff3cd !important;
+                        color: #856404 !important;
+                    }
+                    .fila-normal {
+                        background: #d4edda !important;
+                        color: #155724 !important;
+                    }
+                    .riesgo-badge-alto {
+                        background: #dc3545;
+                        color: white;
+                        padding: 4px 10px;
+                        border-radius: 20px;
+                        font-weight: bold;
+                    }
+                    .riesgo-badge-medio {
+                        background: #fd7e14;
+                        color: white;
+                        padding: 4px 10px;
+                        border-radius: 20px;
+                        font-weight: bold;
+                    }
+                    .riesgo-badge-bajo {
+                        background: #28a745;
+                        color: white;
+                        padding: 4px 10px;
+                        border-radius: 20px;
+                        font-weight: bold;
+                    }
+                    </style>
+                    """, unsafe_allow_html=True)
+                    
+                    # Generar tabla HTML personalizada
+                    tabla_html = '<table class="tabla-riesgo"><thead><tr>'
+                    for col in df_display.columns:
+                        tabla_html += f'<th>{col}</th>'
+                    tabla_html += '</tr></thead><tbody>'
+                    
+                    for _, row in df_display.iterrows():
+                        riesgo_val = row["Riesgo %"]
+                        if riesgo_val > 70:
+                            clase_fila = "fila-critico"
+                            badge_clase = "riesgo-badge-alto"
+                        elif riesgo_val > 40:
+                            clase_fila = "fila-medio"
+                            badge_clase = "riesgo-badge-medio"
+                        else:
+                            clase_fila = "fila-normal"
+                            badge_clase = "riesgo-badge-bajo"
+                        
+                        tabla_html += f'<tr class="{clase_fila}">'
+                        for col in df_display.columns:
+                            valor = row[col]
+                            if col == "Riesgo %":
+                                tabla_html += f'<td><span class="{badge_clase}">{valor:.1f}%</span></td>'
+                            elif col == "IMC" or col == "Creatinina":
+                                tabla_html += f'<td>{valor:.2f}</td>'
+                            else:
+                                tabla_html += f'<td>{valor}</td>'
+                        tabla_html += '</tr>'
+                    
+                    tabla_html += '</tbody></table>'
+                    st.markdown(tabla_html, unsafe_allow_html=True)
                     
                     # Mostrar leyenda
                     st.markdown("""
-                    **Leyenda de colores:**
-                    - 🔴 Fondo rojo claro = Paciente crítico (>70%)
-                    - 🟡 Fondo amarillo claro = Riesgo medio (40-70%)
-                    - 🟢 Fondo verde claro = Normal (<40%)
-                    - 📛 Texto rojo en campo = Valor no proporcionado (se usó valor por defecto)
+                    **Leyenda:** 
+                    🔴 **Rojo** = Crítico (>70%) | 🟡 **Amarillo** = Medio (40-70%) | 🟢 **Verde** = Normal (<40%)
                     """)
+                    
+                    st.markdown("---")
+                    
+                    # ========== BOTÓN DESCARGAR EXCEL FORMATEADO ==========
+                    st.markdown("### 📥 Descargar Reporte Excel")
+                    
+                    def generar_excel_formateado(dataframe, doctor_name):
+                        """Genera un Excel bien formateado para impresión"""
+                        output = BytesIO()
+                        
+                        # Preparar datos
+                        df_excel = dataframe.copy()
+                        df_excel = df_excel.sort_values("riesgo", ascending=False)
+                        
+                        # Renombrar columnas para el reporte
+                        columnas_reporte = {
+                            "nombre_paciente": "Nombre del Paciente",
+                            "edad": "Edad (años)",
+                            "imc": "IMC (kg/m²)",
+                            "presion_sistolica": "Presión Sistólica (mmHg)",
+                            "glucosa_ayunas": "Glucosa Ayunas (mg/dL)",
+                            "creatinina": "Creatinina (mg/dL)",
+                            "riesgo": "Riesgo ERC (%)",
+                            "nivel": "Clasificación",
+                            "recomendacion": "Recomendación Clínica"
+                        }
+                        
+                        # Seleccionar y renombrar columnas
+                        cols_disponibles = [c for c in columnas_reporte.keys() if c in df_excel.columns]
+                        df_reporte = df_excel[cols_disponibles].copy()
+                        df_reporte = df_reporte.rename(columns={c: columnas_reporte[c] for c in cols_disponibles})
+                        
+                        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                            # Escribir datos empezando en fila 5 para dejar espacio al encabezado
+                            df_reporte.to_excel(writer, sheet_name='Reporte ERC', index=False, startrow=4)
+                            
+                            workbook = writer.book
+                            worksheet = writer.sheets['Reporte ERC']
+                            
+                            # Importar estilos de openpyxl
+                            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+                            from openpyxl.utils import get_column_letter
+                            
+                            # Estilos
+                            borde = Border(
+                                left=Side(style='thin'),
+                                right=Side(style='thin'),
+                                top=Side(style='thin'),
+                                bottom=Side(style='thin')
+                            )
+                            
+                            header_fill = PatternFill(start_color="002868", end_color="002868", fill_type="solid")
+                            header_font = Font(color="FFFFFF", bold=True, size=11)
+                            
+                            critico_fill = PatternFill(start_color="F8D7DA", end_color="F8D7DA", fill_type="solid")
+                            critico_font = Font(color="721C24", bold=True)
+                            
+                            medio_fill = PatternFill(start_color="FFF3CD", end_color="FFF3CD", fill_type="solid")
+                            medio_font = Font(color="856404")
+                            
+                            normal_fill = PatternFill(start_color="D4EDDA", end_color="D4EDDA", fill_type="solid")
+                            normal_font = Font(color="155724")
+                            
+                            # Título del reporte
+                            worksheet.merge_cells('A1:I1')
+                            worksheet['A1'] = "🩺 NEFROPREDICT RD - REPORTE DE EVALUACIÓN DE RIESGO ERC"
+                            worksheet['A1'].font = Font(size=16, bold=True, color="002868")
+                            worksheet['A1'].alignment = Alignment(horizontal='center')
+                            
+                            # Info del reporte
+                            worksheet['A2'] = f"Médico: {doctor_name}"
+                            worksheet['A2'].font = Font(size=11, bold=True)
+                            worksheet['A3'] = f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+                            worksheet['A3'].font = Font(size=11)
+                            worksheet['D2'] = f"Total Pacientes: {len(df_reporte)}"
+                            worksheet['D2'].font = Font(size=11, bold=True)
+                            worksheet['D3'] = f"Críticos: {len(df_excel[df_excel['riesgo']>70])} | Medio: {len(df_excel[(df_excel['riesgo']>40) & (df_excel['riesgo']<=70)])} | Normal: {len(df_excel[df_excel['riesgo']<=40])}"
+                            worksheet['D3'].font = Font(size=11)
+                            
+                            # Aplicar estilos a encabezados (fila 5)
+                            for col_num, column_title in enumerate(df_reporte.columns, 1):
+                                cell = worksheet.cell(row=5, column=col_num)
+                                cell.fill = header_fill
+                                cell.font = header_font
+                                cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+                                cell.border = borde
+                            
+                            # Aplicar estilos a datos
+                            for row_num, (_, row_data) in enumerate(df_reporte.iterrows(), 6):
+                                # Determinar color de fila según riesgo
+                                riesgo_val = df_excel.iloc[row_num-6]["riesgo"]
+                                
+                                if riesgo_val > 70:
+                                    fill = critico_fill
+                                    font = critico_font
+                                elif riesgo_val > 40:
+                                    fill = medio_fill
+                                    font = medio_font
+                                else:
+                                    fill = normal_fill
+                                    font = normal_font
+                                
+                                for col_num, value in enumerate(row_data, 1):
+                                    cell = worksheet.cell(row=row_num, column=col_num)
+                                    cell.fill = fill
+                                    cell.font = font
+                                    cell.border = borde
+                                    cell.alignment = Alignment(horizontal='center', vertical='center')
+                            
+                            # Ajustar ancho de columnas
+                            anchos = [30, 12, 15, 22, 22, 18, 15, 18, 35]
+                            for i, ancho in enumerate(anchos[:len(df_reporte.columns)], 1):
+                                worksheet.column_dimensions[get_column_letter(i)].width = ancho
+                            
+                            # Ajustar altura de filas
+                            worksheet.row_dimensions[1].height = 25
+                            worksheet.row_dimensions[5].height = 30
+                            
+                            # Agregar leyenda al final
+                            ultima_fila = len(df_reporte) + 7
+                            worksheet.merge_cells(f'A{ultima_fila}:I{ultima_fila}')
+                            worksheet[f'A{ultima_fila}'] = "Leyenda: 🔴 Rojo = Crítico (>70% riesgo) | 🟡 Amarillo = Riesgo Medio (40-70%) | 🟢 Verde = Normal (<40%)"
+                            worksheet[f'A{ultima_fila}'].font = Font(size=10, italic=True)
+                            
+                            # Configurar página para impresión
+                            worksheet.print_title_rows = '1:5'
+                            worksheet.page_setup.orientation = 'landscape'
+                            worksheet.page_setup.fitToPage = True
+                            worksheet.page_setup.fitToWidth = 1
+                            worksheet.page_setup.fitToHeight = 0
+                        
+                        output.seek(0)
+                        return output
+                    
+                    col_btn1, col_btn2 = st.columns(2)
+                    
+                    with col_btn1:
+                        excel_file = generar_excel_formateado(df_mostrar, st.session_state.doctor_name)
+                        st.download_button(
+                            label="📥 Descargar Excel Formateado",
+                            data=excel_file,
+                            file_name=f"Reporte_ERC_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True
+                        )
+                    
+                    with col_btn2:
+                        # También opción de CSV simple
+                        csv_data = df_mostrar[columnas_mostrar].to_csv(index=False).encode('utf-8')
+                        st.download_button(
+                            label="📄 Descargar CSV Simple",
+                            data=csv_data,
+                            file_name=f"Reporte_ERC_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                            mime="text/csv",
+                            use_container_width=True
+                        )
+                    
                 else:
                     st.info("No hay pacientes en esta categoría")
                 
