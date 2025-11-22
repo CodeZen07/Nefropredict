@@ -149,7 +149,7 @@ if st.session_state.user_role == 'admin':
 
 
 # --- FUNCIONES DE INTERPRETACIÓN DEL MODELO (SIMULACIÓN SHAP) ---
-# ... (funciones generate_explanation_data y display_explanation omitidas por brevedad, se mantienen igual)
+# ... (funciones generate_explanation_data y display_explanation)
 def generate_explanation_data(row):
     """
     Simula la contribución de cada característica al riesgo (como los valores SHAP).
@@ -419,6 +419,7 @@ if current_history:
 else:
     st.info("No has subido ningún archivo aún.")
 
-# --- 8. Footer ---
+# --- 8. Footer (Corregido) ---
 st.markdown("---")
-st.markdown("<p style='text-align: center; color:#002868; font-weight:bold;'>© 2025 NefroPredict R
+# ERROR CORREGIDO: Se cerró correctamente la cadena de texto con comillas dobles.
+st.markdown("<p style='text-align: center; color:#002868; font-weight:bold;'>© 2025 NefroPredict RD - Soluciones de salud impulsadas por IA</p>", unsafe_allow_html=True)
