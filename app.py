@@ -582,31 +582,31 @@ with tab2:
                 
                 with c1:
                     st.markdown(f"""
-                    <div style="background: linear-gradient(135deg, #ff6b6b, #ee5a5a); padding:25px; border-radius:15px; text-align:center; color:white; cursor:pointer;">
-                        <h1 style="margin:0; font-size:3.5em; color:white;">{len(criticos)}</h1>
-                        <h3 style="margin:5px 0; color:white;">🔴 CRÍTICOS</h3>
-                        <p style="margin:0; opacity:0.9;">Riesgo > 70%</p>
-                        <p style="margin:5px 0; font-weight:bold;">Intervención URGENTE</p>
+                    <div style="background: linear-gradient(135deg, #dc3545, #c82333); padding:25px; border-radius:15px; text-align:center; color:white; box-shadow: 0 4px 15px rgba(220,53,69,0.4);">
+                        <h1 style="margin:0; font-size:3.5em; color:white !important;">{len(criticos)}</h1>
+                        <h3 style="margin:5px 0; color:white !important;">🔴 CRÍTICOS</h3>
+                        <p style="margin:0; color:#ffcccc;">Riesgo > 70%</p>
+                        <p style="margin:5px 0; font-weight:bold; color:white !important;">Intervención URGENTE</p>
                     </div>
                     """, unsafe_allow_html=True)
                 
                 with c2:
                     st.markdown(f"""
-                    <div style="background: linear-gradient(135deg, #feca57, #ff9f43); padding:25px; border-radius:15px; text-align:center; color:white;">
-                        <h1 style="margin:0; font-size:3.5em; color:white;">{len(medios)}</h1>
-                        <h3 style="margin:5px 0; color:white;">🟡 RIESGO MEDIO</h3>
-                        <p style="margin:0; opacity:0.9;">Riesgo 40-70%</p>
-                        <p style="margin:5px 0; font-weight:bold;">Control Estricto</p>
+                    <div style="background: linear-gradient(135deg, #fd7e14, #e76f00); padding:25px; border-radius:15px; text-align:center; color:white; box-shadow: 0 4px 15px rgba(253,126,20,0.4);">
+                        <h1 style="margin:0; font-size:3.5em; color:white !important;">{len(medios)}</h1>
+                        <h3 style="margin:5px 0; color:white !important;">🟡 RIESGO MEDIO</h3>
+                        <p style="margin:0; color:#fff3cd;">Riesgo 40-70%</p>
+                        <p style="margin:5px 0; font-weight:bold; color:white !important;">Control Estricto</p>
                     </div>
                     """, unsafe_allow_html=True)
                 
                 with c3:
                     st.markdown(f"""
-                    <div style="background: linear-gradient(135deg, #1dd1a1, #10ac84); padding:25px; border-radius:15px; text-align:center; color:white;">
-                        <h1 style="margin:0; font-size:3.5em; color:white;">{len(normales)}</h1>
-                        <h3 style="margin:5px 0; color:white;">🟢 NORMALES</h3>
-                        <p style="margin:0; opacity:0.9;">Riesgo < 40%</p>
-                        <p style="margin:5px 0; font-weight:bold;">Seguimiento Rutinario</p>
+                    <div style="background: linear-gradient(135deg, #28a745, #1e7e34); padding:25px; border-radius:15px; text-align:center; color:white; box-shadow: 0 4px 15px rgba(40,167,69,0.4);">
+                        <h1 style="margin:0; font-size:3.5em; color:white !important;">{len(normales)}</h1>
+                        <h3 style="margin:5px 0; color:white !important;">🟢 NORMALES</h3>
+                        <p style="margin:0; color:#d4edda;">Riesgo < 40%</p>
+                        <p style="margin:5px 0; font-weight:bold; color:white !important;">Seguimiento Rutinario</p>
                     </div>
                     """, unsafe_allow_html=True)
                 
