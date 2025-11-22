@@ -709,7 +709,7 @@ if st.session_state.role == "admin":
                     user_sel = doctor_seleccionado.split("(@")[1].replace(")", "")
                     info_sel = doctores[user_sel]
                     
-                    st.markdown(f"##### Gestionando: **{info_sel['name']}**")
+                    st.markdown(f"##### Gestionando: **{info_sel.get('name', user_sel)}**")
                     
                     col1, col2, col3 = st.columns(3)
                     
