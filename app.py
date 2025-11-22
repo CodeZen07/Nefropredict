@@ -7,8 +7,103 @@ import json
 import os
 import io
 
-# --- CONFIGURACIÓN DE LA PÁGINA ---
+# --- CONFIGURACIÓN DE LA PÁGINA Y ESTILOS MEJORADOS (OPCIÓN A Y B) ---
 st.set_page_config(page_title="NefroPredict RD", page_icon="🫘", layout="wide")
+
+# Estilos de Interfaz Clínica Limpia (Opción A) con colores de Impacto (Opción B)
+st.markdown("""
+<style>
+    /* Tipografía y claridad general */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    html, body, [class*="st-"] {
+        font-family: 'Inter', sans-serif;
+        color: #333333; /* Texto oscuro para máxima legibilidad */
+    }
+
+    /* Títulos y Branding */
+    .st-emotion-cache-10trblm h1, .st-emotion-cache-10trblm h3 {
+        color: #002868; /* Azul oscuro profesional */
+    }
+    .st-emotion-cache-10trblm h2 {
+        border-bottom: 2px solid #EEEEEE;
+        padding-bottom: 5px;
+        margin-top: 20px;
+    }
+    
+    /* Contenedor principal para fondo blanco y limpio */
+    .block-container {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        padding-left: 2rem;
+        padding-right: 2rem;
+    }
+
+    /* Estilo de Botones y Elementos Interactivos */
+    .stButton>button {
+        background-color: #002868;
+        color: white;
+        border-radius: 8px;
+        font-weight: 600;
+        padding: 10px 20px;
+        transition: background-color 0.3s;
+    }
+    .stButton>button:hover {
+        background-color: #0040A0;
+    }
+
+    /* Estilos de Métricas (KPIs) - Más grandes y claros */
+    [data-testid="stMetricValue"] {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1e8449; /* Verde para valores positivos/importantes */
+    }
+    
+    /* Medidor de Riesgo (Opción B - Visualización Impactante) */
+    .risk-gauge-container {
+        border: 2px solid #ccc;
+        border-radius: 12px;
+        padding: 15px;
+        text-align: center;
+        margin-bottom: 20px;
+        background: #f9f9f9;
+    }
+    .risk-gauge-bar {
+        height: 30px;
+        border-radius: 15px;
+        background: linear-gradient(to right, 
+            #4CAF50 0%, /* Verde (Moderado) */
+            #FFC400 40%, /* Amarillo (Alto) */
+            #FFC400 70%, /* Naranja/Amarillo (Alto) */
+            #CE1126 100% /* Rojo (Muy Alto) */
+        );
+        position: relative;
+        margin-top: 10px;
+    }
+    .risk-gauge-marker {
+        position: absolute;
+        top: -10px;
+        transform: translateX(-50%);
+        width: 4px;
+        height: 50px;
+        background-color: black;
+        border-radius: 2px;
+        z-index: 10;
+        box-shadow: 0 0 5px rgba(0,0,0,0.5);
+    }
+    .risk-label {
+        position: absolute;
+        top: 35px;
+        font-size: 0.8em;
+        font-weight: 600;
+        color: #555;
+    }
+    .risk-label.moderate { left: 0%; transform: translateX(-50%); color: #4CAF50; }
+    .risk-label.high { left: 55%; transform: translateX(-50%); }
+    .risk-label.critical { right: 0%; transform: translateX(50%); color: #CE1126; }
+
+</style>
+""", unsafe_allow_html=True)
+
 
 # --- 0. CLASE DE PERSISTENCIA SIMULADA (REEMPLAZO DE FIRESTORE) ---
 DB_FILE_PATH = "nefro_db.json"
@@ -48,13 +143,7 @@ class DataStore:
             if 'patient_records' not in db:
                 db['patient_records'] = []
                 self._write_db(db)
-            # Limpiar y reescribir si el formato necesita el campo 'nombre_paciente'
-            # Esta parte se deja comentada para no resetear la DB si ya se usó,
-            # pero se asegura que exista el campo.
-            # if len(db['patient_records']) < 1:
-            #      db['patient_records'] = initial_data['patient_records']
-            #      self._write_db(db)
-
+            
     def _read_db(self):
         """Lee todos los datos del archivo DB."""
         if not os.path.exists(self.file_path):
@@ -89,6 +178,16 @@ class DataStore:
         db['users'][username] = user_data
         self._write_db(db)
 
+    # NUEVA FUNCIÓN PARA ACTUALIZAR USUARIO (USADA EN ADMIN)
+    def update_user(self, username, updates):
+        db = self._read_db()
+        if username in db['users']:
+            db['users'][username].update(updates)
+            self._write_db(db)
+            return True
+        return False
+
+
     def get_file_history(self):
         """Obtiene todo el historial de archivos subidos."""
         db = self._read_db()
@@ -100,11 +199,9 @@ class DataStore:
         db['file_history'].insert(0, record) 
         self._write_db(db)
         
-    # FUNCIONES ACTUALIZADAS PARA HISTORIAL DE PACIENTES USANDO NOMBRE
     def add_patient_record(self, record):
         """Añade un nuevo registro individual de paciente."""
         db = self._read_db()
-        # Insertar al inicio para que el más reciente aparezca primero
         db['patient_records'].insert(0, record) 
         self._write_db(db)
 
@@ -121,9 +218,9 @@ class DataStore:
 db_store = DataStore(DB_FILE_PATH)
 
 # --- 1. Título y Branding ---
-st.markdown("<h1 style='text-align: center; color:#002868;'>🫘 NefroPredict RD 2025</h1>", unsafe_allow_html=True)
-st.markdown("<h3 style='text-align: center;'>Detección temprana de enfermedad renal crónica</h3>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color:#CE1126; font-size:1.1em;'>República Dominicana 🇩🇴</p>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;'>🫘 NefroPredict RD 2025</h1>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center; color: #555555;'>Detección temprana de enfermedad renal crónica</h3>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color:#CE1126; font-size:1.1em; font-weight: 600;'>República Dominicana 🇩🇴</p>", unsafe_allow_html=True)
 
 # --- FUNCIÓN DE CARGA DE MODELO ---
 @st.cache_resource
@@ -192,7 +289,7 @@ current_status = "Activo" if current_user_data.get('active', True) else "INACTIV
 with col_user:
     st.success(f"✅ Sesión activa | Usuario: **{st.session_state.username}** | Rol: **{st.session_state.user_role.capitalize()}** | Estado: **{current_status}**")
 with col_logout:
-    if st.button("Cerrar Sesión"):
+    if st.button("Cerrar Sesión", key="logout_btn"):
         st.session_state.logged_in = False
         st.session_state.user_id = None
         st.session_state.user_role = None
@@ -211,11 +308,6 @@ def create_new_user_db(username, password, role="doctor"):
     user_data = {"pwd": password, "role": role, "id": user_id, "active": True}
     db_store.create_user(username, user_data)
     return True, f"Usuario '{username}' ({role.capitalize()}) creado con éxito (ID: {user_id})."
-
-def update_user_status_db(username, is_active):
-    """Actualiza el estado 'active' de un usuario en la DB (DataStore)."""
-    # Función dummy para el ejemplo, pero debe ser implementada
-    return True 
 
 def get_doctors_db():
     """Obtiene la lista de todos los médicos (no admin) de la DB."""
@@ -323,32 +415,34 @@ def generate_individual_report_html(patient_data, risk_percentage, doctor_name, 
         </tr>
         """
 
+    # Estilos CSS más limpios para el reporte
     html_content = f"""
     <!DOCTYPE html>
     <html>
     <head>
         <title>Reporte NefroPredict - {patient_data['nombre_paciente']}</title>
         <style>
-            @media print {{
-                body {{ font-family: 'Times New Roman', Times, serif; color: #333; margin: 0; padding: 0; }}
+            @media print, screen {{
+                body {{ font-family: 'Inter', sans-serif; color: #333; margin: 0; padding: 0; }}
                 h1, h2, h3 {{ margin-top: 0; }}
-                .report-container {{ width: 210mm; margin: 0 auto; padding: 20mm; }}
-                .header {{ text-align: center; border-bottom: 2px solid #002868; padding-bottom: 10px; margin-bottom: 20px; }}
+                .report-container {{ width: 210mm; margin: 0 auto; padding: 20mm; box-shadow: 0 0 10px rgba(0,0,0,0.1); }}
+                .header {{ text-align: center; border-bottom: 3px solid #002868; padding-bottom: 10px; margin-bottom: 20px; }}
                 .doctor-info {{ text-align: right; font-size: 0.9em; }}
                 .risk-box {{ 
                     padding: 15px; 
-                    margin-top: 10px; 
-                    border: 2px solid {color}; 
-                    background-color: {color}20;
+                    margin-top: 20px; 
+                    border: 3px solid {color}; 
+                    background-color: {color}15; /* Sombra ligera del color de riesgo */
                     text-align: center;
+                    border-radius: 8px;
                 }}
-                .risk-level {{ font-size: 2.5em; font-weight: bold; color: {color}; }}
+                .risk-level {{ font-size: 3em; font-weight: bold; color: {color}; }}
                 .data-table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
-                .data-table th, .data-table td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
-                .data-table th {{ background-color: #f2f2f2; }}
-                .recommendation {{ margin-top: 30px; padding: 15px; border-left: 5px solid {color}; background-color: #f0f0f0; }}
-                .explanation-table {{ width: 50%; border-collapse: collapse; margin-top: 10px; float: right;}}
-                .explanation-table th, .explanation-table td {{ padding: 5px; text-align: left; border: none; border-bottom: 1px dotted #ccc;}}
+                .data-table th, .data-table td {{ border: 1px solid #ddd; padding: 10px; text-align: left; }}
+                .data-table th {{ background-color: #f0f0f0; }}
+                .recommendation {{ margin-top: 30px; padding: 15px; border-left: 5px solid {color}; background-color: #f5f5f5; border-radius: 4px; }}
+                .explanation-table {{ width: 60%; border-collapse: collapse; margin-top: 10px; float: right;}}
+                .explanation-table th, .explanation-table td {{ padding: 8px; text-align: left; border: none; border-bottom: 1px dotted #ccc;}}
             }}
             /* Estilos para visualización en Streamlit */
             .printable-report {{ border: 1px solid #ccc; padding: 20px; border-radius: 8px; background-color: white; }}
@@ -357,8 +451,8 @@ def generate_individual_report_html(patient_data, risk_percentage, doctor_name, 
     <body>
         <div class="report-container printable-report">
             <div class="header">
-                <h1 style="color:#002868;">NefroPredict RD</h1>
-                <h3>Reporte de Riesgo de Enfermedad Renal Crónica</h3>
+                <h1 style="color:#002868; font-size: 1.8em;">NefroPredict RD</h1>
+                <h3 style="color:#555;">Reporte de Riesgo de Enfermedad Renal Crónica</h3>
             </div>
             
             <div class="doctor-info">
@@ -436,7 +530,8 @@ if st.session_state.user_role == 'doctor' or st.session_state.user_role == 'admi
     
     st.subheader("Selección de Modo de Evaluación")
     
-    tab_individual, tab_masiva, tab_patient_history, tab_historial = st.tabs(["🩺 Predicción Individual", "📁 Carga Masiva (Excel)", "📂 Historial Clínico", "⏱️ Mi Historial"])
+    # Incluyo una pestaña 'Otros Cálculos' como preparación para la expansión a Cardiología/Medicina Crítica
+    tab_individual, tab_masiva, tab_patient_history, tab_otros, tab_historial = st.tabs(["🩺 Predicción Individual", "📁 Carga Masiva (Excel)", "📂 Historial Clínico", "⭐ Otros Cálculos Clínicos", "⏱️ Mi Historial"])
 
     # =================================================================
     # 7.1 PESTAÑA DE PREDICCIÓN INDIVIDUAL
@@ -516,18 +611,39 @@ if st.session_state.user_role == 'doctor' or st.session_state.user_role == 'admi
             report_data = st.session_state.last_individual_report
             patient_name = report_data['data']['nombre_paciente']
             risk_percentage = report_data['risk']
-            nivel, color, _ = get_risk_level(risk_percentage)
+            nivel, color, recomendacion = get_risk_level(risk_percentage)
             
             st.markdown("---")
             st.markdown("### 3. Resultados y Reporte Instantáneo")
             
-            col_res_risk, col_res_level = st.columns([2, 2])
+            # --- MEJORA VISUAL: MEDIDOR DE RIESGO ESTILIZADO (OPCIÓN B) ---
             
-            with col_res_risk:
-                st.markdown(f"<div style='background-color: {color}; color: white; padding: 20px; border-radius: 8px; text-align: center;'><h2>RIESGO DE ERC</h2><h1 style='font-size: 3em;'>{risk_percentage:.1f}%</h1></div>", unsafe_allow_html=True)
+            # Calcular la posición del marcador (0 a 100%)
+            marker_position = risk_percentage 
             
-            with col_res_level:
-                st.markdown(f"<div style='border: 2px solid {color}; padding: 20px; border-radius: 8px; height: 100%;'><h3>Nivel de Riesgo Actual</h3><h2 style='color: {color};'>{nivel}</h2></div>", unsafe_allow_html=True)
+            st.markdown(f"""
+                <div class="risk-gauge-container">
+                    <h2 style="color: {color}; margin-bottom: 5px;">{nivel}</h2>
+                    <h1 style="font-size: 3.5em; color: #333; margin-top: 0; margin-bottom: 20px;">{risk_percentage:.1f}%</h1>
+                    
+                    <div class="risk-gauge-bar">
+                        <div class="risk-gauge-marker" style="left: {marker_position}%;"></div>
+                        <span class="risk-label moderate" style="left: 20%;">Moderado (0-40%)</span>
+                        <span class="risk-label high">Alto (40-70%)</span>
+                        <span class="risk-label critical" style="right: -5%;">Muy Alto (70-100%)</span>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Recomendación clínica destacada
+            st.markdown(f"""
+                <div style='border: 1px solid #ddd; padding: 15px; border-left: 5px solid {color}; background-color: #f0f0f0; border-radius: 4px;'>
+                    <h4 style='color:{color};'>Recomendación Clínica</h4>
+                    <p style='font-size: 1.1em;'>{recomendacion}</p>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # --- FIN MEJORA VISUAL ---
 
             st.markdown("---")
             
@@ -540,7 +656,7 @@ if st.session_state.user_role == 'doctor' or st.session_state.user_role == 'admi
             
             st.components.v1.html(
                 f"""
-                <button onclick="window.printReport()" style="background-color: #002868; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 1.1em;">
+                <button onclick="window.printReport()" style="background-color: #CE1126; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 1.1em;">
                     Imprimir / Guardar Reporte PDF (Dr. {st.session_state.username.upper()})
                 </button>
                 <div style="height: 10px;"></div>
@@ -713,27 +829,36 @@ if st.session_state.user_role == 'doctor' or st.session_state.user_role == 'admi
                     status = "Mejoría Significativa"
                     description = f"El riesgo ha **disminuido** significativamente en {abs(risk_change):.1f} puntos porcentuales (de {initial_risk:.1f}% a {current_risk:.1f}%). La intervención está funcionando."
                     status_color = "#27ae60" # Verde
+                    status_icon = "✅"
                 elif risk_change < 0:
                     status = "Riesgo en Mejoría"
                     description = f"El riesgo ha **disminuido** en {abs(risk_change):.1f} puntos porcentuales. Continuar con el seguimiento actual."
                     status_color = "#2ecc71" # Verde claro
+                    status_icon = "⬇️"
                 elif risk_change > 10:
                     status = "Riesgo Progresivo (Alarma)"
                     description = f"El riesgo ha **aumentado** significativamente en {risk_change:.1f} puntos porcentuales (de {initial_risk:.1f}% a {current_risk:.1f}%). Requiere revisión inmediata del plan de tratamiento."
                     status_color = "#e74c3c" # Rojo
+                    status_icon = "🚨"
                 elif risk_change > 0:
                     status = "Riesgo en Aumento Leve"
                     description = f"El riesgo ha **aumentado** ligeramente en {risk_change:.1f} puntos porcentuales. Monitorear los biomarcadores en la próxima consulta."
                     status_color = "#f39c12" # Naranja
+                    status_icon = "⬆️"
                 else:
                     status = "Riesgo Estable"
                     description = f"El riesgo se ha mantenido **estable** ({initial_risk:.1f}% vs {current_risk:.1f}%). Mantener la vigilancia."
                     status_color = "#3498db" # Azul
+                    status_icon = "↔️"
                     
+                # MEJORA VISUAL: Tendencia destacada
                 st.markdown(f"""
-                    <div style='border-left: 5px solid {status_color}; padding: 10px; background-color: #f7f7f7; border-radius: 4px;'>
-                        <h4 style='color: {status_color}; margin-top: 0;'>Estado Actual: {status}</h4>
-                        <p>{description}</p>
+                    <div style='border-left: 5px solid {status_color}; padding: 15px; background-color: #e8e8e8; border-radius: 4px; display: flex; align-items: center;'>
+                        <span style='font-size: 2.5em; margin-right: 15px;'>{status_icon}</span>
+                        <div>
+                            <h4 style='color: {status_color}; margin-top: 0; margin-bottom: 5px;'>{status}</h4>
+                            <p style='margin: 0; font-size: 0.9em;'>{description}</p>
+                        </div>
                     </div>
                 """, unsafe_allow_html=True)
                 
@@ -769,9 +894,23 @@ if st.session_state.user_role == 'doctor' or st.session_state.user_role == 'admi
             else:
                 st.warning(f"No se encontraron registros de predicciones guardadas para el paciente: **{patient_search_name}**. Realiza una predicción individual para guardar el primer registro.")
 
+    # =================================================================
+    # 7.4 PESTAÑA DE OTROS CÁLCULOS CLÍNICOS (Preparación para expansión)
+    # =================================================================
+    with tab_otros:
+        st.markdown("#### 🧑‍⚕️ Calculadoras y Escalas de Riesgo Adicionales")
+        st.info("Esta sección está reservada para las escalas de Cardiología y Medicina Crítica que deseas integrar (ej: CHA₂DS₂-VASc, CURB-65).")
+        st.info("Para avanzar con la expansión, por favor dime qué cálculo deseas que agregue primero. Por ejemplo: 'Quiero la escala CHA₂DS₂-VASc'.")
+
+        st.markdown("---")
+        st.markdown("#### ¿Por qué expandir la app?")
+        st.markdown("""
+        La expansión a otras escalas previene la necesidad de que los médicos cambien de aplicación. Centralizando Nefrología con Cardiología/Crítico, creamos un **hub de prevención** útil para un médico general, internista o cardiólogo. 
+        """)
+
 
     # =================================================================
-    # 7.4 PESTAÑA DE MI HISTORIAL
+    # 7.5 PESTAÑA DE MI HISTORIAL
     # =================================================================
     with tab_historial:
         st.markdown("#### Archivos Subidos por Ti")
@@ -835,8 +974,8 @@ if st.session_state.user_role == 'admin':
             st.markdown("#### ➕ Crear Nuevo Médico")
             st.info("Nota: Los usuarios creados aquí serán persistentes.")
             
-            new_user = st.text_input("Nombre de Usuario del Nuevo Médico", key="new_user_input").lower()
-            new_pwd = st.text_input("Contraseña Temporal", type="password", key="new_pwd_input")
+            new_user = st.text_input("Nombre de Usuario del Nuevo Médico", key="new_user_input_admin").lower()
+            new_pwd = st.text_input("Contraseña Temporal", type="password", key="new_pwd_input_admin")
             if st.button("Crear Médico y Acceso", key="btn_create_user"):
                 if new_user and new_pwd:
                     success, message = create_new_user_db(new_user, new_pwd, role="doctor")
@@ -881,7 +1020,6 @@ if st.session_state.user_role == 'admin':
                 
                 if st.button("Aplicar Cambio de Estado", key="btn_update_status"):
                     is_active = (new_status == "Activo")
-                    # Lógica de actualización (simulada)
                     if db_store.update_user(user_to_manage, {'active': is_active}):
                         st.success(f"Estado de '{user_to_manage}' actualizado a: {new_status}")
                         st.rerun()
