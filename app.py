@@ -63,7 +63,20 @@ class DataStore:
 
     def _load(self):
         with open(DB_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+        # Asegurar que existan todas las keys necesarias
+        if "users" not in data:
+            data["users"] = {
+                "admin": {"pwd": "admin", "role": "admin", "name": "Administrador", "active": True}
+            }
+        if "patients" not in data:
+            data["patients"] = []
+        if "uploads" not in data:
+            data["uploads"] = []
+        # Guardar si se agregaron keys faltantes
+        with open(DB_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+        return data
 
     def save(self):
         with open(DB_FILE, "w", encoding="utf-8") as f:
