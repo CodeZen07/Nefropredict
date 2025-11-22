@@ -14,7 +14,7 @@ st.markdown("<h3 style='text-align: center;'>Detección temprana de enfermedad r
 st.markdown("<p style='text-align: center; color:#CE1126; font-size:1.1em;'>República Dominicana 🇩🇴</p>", unsafe_allow_html=True)
 
 # --- FUNCIÓN DE CARGA DE MODELO CON CACHÉ ---
-# NOTA: Esta función no se ejecutará en modo DEBUG, pero la mantenemos.
+# NOTA: Esta función cachea la carga para que sea rápida.
 @st.cache_resource
 def load_model(path):
     """Carga el modelo de Machine Learning y lo cachea para un rápido acceso."""
@@ -23,17 +23,17 @@ def load_model(path):
         st.sidebar.success("Modelo ML cargado correctamente.")
         return model
     except FileNotFoundError:
-        st.sidebar.error("⚠️ Error: Archivo de modelo (modelo_erc.joblib) no encontrado.")
+        st.sidebar.error("⚠️ Error: Archivo de modelo (modelo_erc.joblib) no encontrado. Usando modo simulación.")
         return None
     except Exception as e:
-        st.sidebar.error(f"Error al cargar el modelo: {e}")
+        st.sidebar.error(f"Error al cargar el modelo: {e}. Usando modo simulación.")
         return None
 
 # *************************************************************************
-# --- BLOQUE DE DEPURACIÓN TEMPORAL (HEMOS DESACTIVADO LA CARGA DEL MODELO) ---
-# Al desactivar la carga, la aplicación ya no se cae por el binario y el login debería aparecer.
-nefro_model = None
-model_loaded = False 
+# --- INICIO: CARGA DEL MODELO REAL ---
+# Intentamos cargar el modelo real usando la función load_model.
+nefro_model = load_model('modelo_erc.joblib')
+model_loaded = nefro_model is not None
 # *************************************************************************
 
 
@@ -186,3 +186,4 @@ else:
 # --- 7. Footer ---
 st.markdown("---")
 st.markdown("<p style='text-align: center; color:#002868; font-weight:bold;'>© 2025 NefroPredict RD - Soluciones de salud impulsadas por IA</p>", unsafe_allow_html=True)
+           
