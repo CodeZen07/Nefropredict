@@ -1,18 +1,19 @@
 import pandas as pd
 import numpy as np
-import time
 import joblib
 import json
 import os
 from datetime import datetime
 import streamlit as st
 import altair as alt
-import streamlit.components.v1 as components
+import plotly.express as px
+import plotly.graph_objects as go
+from io import BytesIO
 
 # =============================================
 # CONFIGURACIÓN Y ESTILOS
 # =============================================
-st.set_page_config(page_title="NefroPredict RD", page_icon="Kidney", layout="wide")
+st.set_page_config(page_title="NefroPredict RD", page_icon="🩺", layout="wide")
 
 st.markdown("""
 <style>
@@ -20,14 +21,21 @@ st.markdown("""
     body {font-family: 'Inter', sans-serif;}
     h1, h2, h3 {color: #002868 !important;}
     .stButton>button {background: #002868; color: white; border-radius: 12px; padding: 0.7rem 1.5rem; font-weight:600;}
-    .risk-high {background:#ffe5e5; border-left:6px solid #CE1126; padding:15px; border-radius:8px; margin:10px 0;}
-    .risk-med  {background:#fff4e5; border-left:6px solid #FFC400; padding:15px; border-radius:8px; margin:10px 0;}
-    .risk-low  {background:#e5f7e5; border-left:6px solid #4CAF50; padding:15px; border-radius:8px; margin:10px 0;}
+    .stButton>button:hover {background: #001a4d;}
+    .metric-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px; border-radius: 15px; color: white; text-align: center;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .risk-high {background: linear-gradient(135deg, #ff6b6b, #ee5a5a); padding:20px; border-radius:12px; color:white; text-align:center;}
+    .risk-med {background: linear-gradient(135deg, #feca57, #ff9f43); padding:20px; border-radius:12px; color:white; text-align:center;}
+    .risk-low {background: linear-gradient(135deg, #1dd1a1, #10ac84); padding:20px; border-radius:12px; color:white; text-align:center;}
+    .patient-card {background:#f8f9fa; padding:15px; border-radius:10px; margin:10px 0; border-left:4px solid #002868;}
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1 style='text-align:center;'>NefroPredict RD 2025</h1>", unsafe_allow_html=True)
-st.markdown("<h3 style='text-align:center;color:#555;'>Detección temprana de ERC • República Dominicana</h3>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align:center;'>🩺 NefroPredict RD 2025</h1>", unsafe_allow_html=True)
+st.markdown("<h4 style='text-align:center;color:#555;'>Detección temprana de ERC • República Dominicana</h4>", unsafe_allow_html=True)
 
 # =============================================
 # BASE DE DATOS
@@ -89,8 +97,8 @@ class DataStore:
         self.data["patients"].insert(0, record)
         self.save()
 
-    def get_patients_by_doctor(self, user_id_or_name):
-        return [p for p in self.data["patients"] if p["doctor_user"] == user_id_or_name]
+    def get_patients_by_doctor(self, user_id):
+        return [p for p in self.data["patients"] if p["doctor_user"] == user_id]
 
     def get_all_patients(self):
         return self.data["patients"]
@@ -110,7 +118,198 @@ def load_model():
         return joblib.load("modelo_erc.joblib")
     except:
         return None
+
 model = load_model()
+
+# =============================================
+# FUNCIONES DE RIESGO Y PREDICCIÓN
+# =============================================
+def riesgo_level(risk):
+    if risk > 70:
+        return "MUY ALTO", "#CE1126", "Intervención URGENTE - Referir a nefrología"
+    elif risk > 40:
+        return "ALTO", "#FFC400", "Intervención Media - Control estricto"
+    else:
+        return "MODERADO", "#4CAF50", "Seguimiento Rutinario - Control periódico"
+
+def predecir(row):
+    feats = np.array([[row["edad"], row["imc"], row["presion_sistolica"],
+                       row["glucosa_ayunas"], row["creatinina"]]])
+    if model:
+        return round(model.predict_proba(feats)[0][1] * 100, 1)
+    else:
+        # Simulación realista basada en factores de riesgo
+        base = 10
+        base += (row["creatinina"] - 1) * 32
+        base += max(0, row["glucosa_ayunas"] - 126) * 0.3
+        base += max(0, row["presion_sistolica"] - 140) * 0.2
+        base += max(0, row["imc"] - 30) * 0.5
+        base += max(0, row["edad"] - 60) * 0.3
+        return round(max(1, min(99, base + np.random.uniform(-5, 8))), 1)
+
+def crear_gauge_riesgo(riesgo):
+    """Crear gráfico de velocímetro para el riesgo"""
+    if riesgo > 70:
+        color = "#CE1126"
+    elif riesgo > 40:
+        color = "#FFC400"
+    else:
+        color = "#4CAF50"
+    
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number+delta",
+        value=riesgo,
+        domain={'x': [0, 1], 'y': [0, 1]},
+        title={'text': "Riesgo de ERC (%)", 'font': {'size': 24, 'color': '#002868'}},
+        gauge={
+            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "#002868"},
+            'bar': {'color': color},
+            'bgcolor': "white",
+            'borderwidth': 2,
+            'bordercolor': "#002868",
+            'steps': [
+                {'range': [0, 40], 'color': '#e5f7e5'},
+                {'range': [40, 70], 'color': '#fff4e5'},
+                {'range': [70, 100], 'color': '#ffe5e5'}
+            ],
+            'threshold': {
+                'line': {'color': "red", 'width': 4},
+                'thickness': 0.75,
+                'value': riesgo
+            }
+        }
+    ))
+    fig.update_layout(height=300, margin=dict(l=20, r=20, t=50, b=20))
+    return fig
+
+def crear_grafico_factores(paciente):
+    """Crear gráfico de barras con los factores de riesgo"""
+    # Normalizar valores para comparación
+    factores = {
+        'Edad': min(100, (paciente['edad'] / 100) * 100),
+        'IMC': min(100, (paciente['imc'] / 40) * 100),
+        'Presión': min(100, (paciente['presion_sistolica'] / 200) * 100),
+        'Glucosa': min(100, (paciente['glucosa_ayunas'] / 300) * 100),
+        'Creatinina': min(100, (paciente['creatinina'] / 5) * 100)
+    }
+    
+    colors = []
+    for k, v in factores.items():
+        if v > 70:
+            colors.append('#CE1126')
+        elif v > 50:
+            colors.append('#FFC400')
+        else:
+            colors.append('#4CAF50')
+    
+    fig = go.Figure(go.Bar(
+        x=list(factores.keys()),
+        y=list(factores.values()),
+        marker_color=colors,
+        text=[f"{v:.0f}%" for v in factores.values()],
+        textposition='outside'
+    ))
+    fig.update_layout(
+        title="Factores de Riesgo (Normalizados)",
+        yaxis_title="Nivel (%)",
+        height=300,
+        margin=dict(l=20, r=20, t=50, b=20)
+    )
+    return fig
+
+def generar_reporte_html(paciente, riesgo, nivel, doctor):
+    """Generar reporte HTML para impresión/PDF"""
+    fecha = datetime.now().strftime("%d/%m/%Y %H:%M")
+    color = '#CE1126' if riesgo > 70 else '#FFC400' if riesgo > 40 else '#4CAF50'
+    
+    return f"""
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Reporte NefroPredict - {paciente['nombre_paciente']}</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ font-family: 'Segoe UI', Arial, sans-serif; background: #f5f5f5; padding: 20px; }}
+        .container {{ max-width: 800px; margin: auto; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.1); }}
+        .header {{ background: linear-gradient(135deg, #002868, #001a4d); color: white; padding: 30px; text-align: center; }}
+        .header h1 {{ font-size: 2em; margin-bottom: 5px; }}
+        .header p {{ opacity: 0.9; }}
+        .content {{ padding: 30px; }}
+        .risk-display {{ text-align: center; padding: 30px; margin: 20px 0; border-radius: 15px; background: linear-gradient(135deg, {color}22, {color}11); border: 3px solid {color}; }}
+        .risk-number {{ font-size: 4em; font-weight: bold; color: {color}; }}
+        .risk-label {{ font-size: 1.5em; color: {color}; margin-top: 10px; }}
+        .info-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }}
+        .info-item {{ background: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid #002868; }}
+        .info-label {{ color: #666; font-size: 0.9em; }}
+        .info-value {{ color: #002868; font-size: 1.3em; font-weight: bold; }}
+        .params-table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+        .params-table th, .params-table td {{ padding: 12px; text-align: left; border-bottom: 1px solid #eee; }}
+        .params-table th {{ background: #002868; color: white; }}
+        .params-table tr:nth-child(even) {{ background: #f8f9fa; }}
+        .recommendation {{ background: linear-gradient(135deg, {color}22, {color}11); padding: 20px; border-radius: 10px; margin: 20px 0; border-left: 5px solid {color}; }}
+        .footer {{ text-align: center; padding: 20px; color: #666; font-size: 0.9em; border-top: 1px solid #eee; }}
+        @media print {{
+            body {{ background: white; padding: 0; }}
+            .container {{ box-shadow: none; }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🩺 NefroPredict RD</h1>
+            <p>Sistema de Detección Temprana de Enfermedad Renal Crónica</p>
+        </div>
+        <div class="content">
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">Paciente</div>
+                    <div class="info-value">{paciente['nombre_paciente']}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Médico Tratante</div>
+                    <div class="info-value">{doctor}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Fecha de Evaluación</div>
+                    <div class="info-value">{fecha}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">ID Evaluación</div>
+                    <div class="info-value">#{datetime.now().strftime('%Y%m%d%H%M')}</div>
+                </div>
+            </div>
+            
+            <div class="risk-display">
+                <div class="risk-number">{riesgo:.1f}%</div>
+                <div class="risk-label">Riesgo {nivel}</div>
+            </div>
+            
+            <h3 style="color: #002868; margin: 20px 0 10px;">Parámetros Clínicos</h3>
+            <table class="params-table">
+                <tr><th>Parámetro</th><th>Valor</th><th>Rango Normal</th></tr>
+                <tr><td>Edad</td><td>{paciente['edad']} años</td><td>-</td></tr>
+                <tr><td>Índice de Masa Corporal</td><td>{paciente['imc']:.1f} kg/m²</td><td>18.5 - 24.9</td></tr>
+                <tr><td>Presión Sistólica</td><td>{paciente['presion_sistolica']} mmHg</td><td>90 - 120</td></tr>
+                <tr><td>Glucosa en Ayunas</td><td>{paciente['glucosa_ayunas']} mg/dL</td><td>70 - 100</td></tr>
+                <tr><td>Creatinina Sérica</td><td>{paciente['creatinina']:.2f} mg/dL</td><td>0.7 - 1.3</td></tr>
+            </table>
+            
+            <div class="recommendation">
+                <h3 style="color: {color}; margin-bottom: 10px;">📋 Recomendación Clínica</h3>
+                <p style="font-size: 1.1em;">{riesgo_level(riesgo)[2]}</p>
+            </div>
+        </div>
+        <div class="footer">
+            <p>NefroPredict RD © 2025 • República Dominicana</p>
+            <p>Este reporte es una herramienta de apoyo diagnóstico y no reemplaza el criterio médico.</p>
+        </div>
+    </div>
+    <script>window.onload = function() {{ window.print(); }}</script>
+</body>
+</html>
+"""
 
 # =============================================
 # LOGIN
@@ -119,29 +318,32 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
-    st.markdown("### Iniciar Sesión")
-    with st.form("login_form"):
-        username = st.text_input("Usuario").lower().strip()
-        password = st.text_input("Contraseña", type="password")
-        if st.form_submit_button("Entrar"):
-            user = db.get_user(username)
-            if user and user["pwd"] == password and user.get("active", True):
-                st.session_state.logged_in = True
-                st.session_state.username = username
-                st.session_state.role = user["role"]
-                st.session_state.doctor_name = user.get("name", username)
-                st.success("Acceso correcto")
-                st.rerun()
-            else:
-                st.error("Usuario o contraseña incorrectos")
+    st.markdown("---")
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("### 🔐 Iniciar Sesión")
+        with st.form("login_form"):
+            username = st.text_input("Usuario").lower().strip()
+            password = st.text_input("Contraseña", type="password")
+            submitted = st.form_submit_button("Entrar", use_container_width=True)
+            if submitted:
+                user = db.get_user(username)
+                if user and user["pwd"] == password and user.get("active", True):
+                    st.session_state.logged_in = True
+                    st.session_state.username = username
+                    st.session_state.role = user["role"]
+                    st.session_state.doctor_name = user.get("name", username)
+                    st.rerun()
+                else:
+                    st.error("❌ Usuario o contraseña incorrectos")
     st.stop()
 
-# Logout
-c1, c2 = st.columns([5,1])
-with c1:
-    st.success(f"Dr(a). **{st.session_state.doctor_name}** • @{st.session_state.username}")
-with c2:
-    if st.button("Salir"):
+# Barra superior con info de usuario
+col1, col2 = st.columns([5, 1])
+with col1:
+    st.success(f"👨‍⚕️ **{st.session_state.doctor_name}** • @{st.session_state.username}")
+with col2:
+    if st.button("🚪 Salir"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
@@ -149,216 +351,213 @@ with c2:
 st.markdown("---")
 
 # =============================================
-# FUNCIONES DE RIESGO
-# =============================================
-def riesgo_level(risk):
-    if risk > 70:  return "MUY ALTO", "#CE1126", "Intervención URGENTE"
-    elif risk > 40: return "ALTO",     "#FFC400", "Intervención Media"
-    else:            return "MODERADO", "#4CAF50", "Seguimiento Rutinario"
-
-def predecir(row):
-    feats = np.array([[row["edad"], row["imc"], row["presion_sistolica"],
-                      row["glucosa_ayunas"], row["creatinina"]]])
-    if model:
-        return round(model.predict_proba(feats)[0][1] * 100, 1)
-    else:
-        # Simulación realista
-        base = 10 + (row["creatinina"]-1)*32 + max(0,row["glucosa_ayunas"]-126)*0.3
-        return round(max(1, min(99, base + np.random.uniform(-10,12))), 1)
-
-def generar_pdf_html(paciente, riesgo, nivel, doctor):
-    fecha = datetime.now().strftime("%d/%m/%Y %H:%M")
-    return f"""
-    <!DOCTYPE html><html><head><meta charset="utf-8"><style>
-    body{{font-family:Arial,sans-serif;margin:40px;background:#f8f9fa}}
-    .card{{background:white;padding:30px;border-radius:15px;box-shadow:0 10px 30px rgba(0,0,0,0.1);max-width:800px;margin:auto}}
-    .header{{background:#002868;color:white;padding:20px;text-align:center;border-radius:12px}}
-    .riesgo{{font-size:4.5em;font-weight:bold;color:{('#CE1126' if riesgo>70 else '#FFC400' if riesgo>40 else '#4CAF50')}}}
-    table{{width:100%;border-collapse:collapse;margin:20px 0}}
-    th,td{{border:1px solid #ddd;padding:12px;text-align:left}}
-    th{{background:#f0f0f0}}
-    </style></head><body>
-    <div class="card">
-        <div class="header"><h1>NefroPredict RD</h1><h3>Reporte Individual</h3></div>
-        <p><strong>Paciente:</strong> {paciente['nombre_paciente']}</p>
-        <p><strong>Médico:</strong> {doctor}</p>
-        <p><strong>Fecha:</strong> {fecha}</p>
-        <h2 style="text-align:center" class="riesgo">{riesgo:.1f}% → {nivel}</h2>
-        <table>
-            <tr><th>Parámetro</th><th>Valor</th></tr>
-            <tr><td>Edad</td><td>{paciente['edad']}</td></tr>
-            <tr><td>IMC</td><td>{paciente['imc']:.1f}</td></tr>
-            <tr><td>Presión Sistólica</td><td>{paciente['presion_sistolica']}</td></tr>
-            <tr><td>Glucosa ayunas</td><td>{paciente['glucosa_ayunas']}</td></tr>
-            <tr><td>Creatinina</td><td>{paciente['creatinina']:.2f}</td></tr>
-        </table>
-        <h3>Recomendación: {riesgo_level(riesgo)[2]}</h3>
-    </div></body></html>
-    """
-
-# =============================================
-# PESTAÑAS
+# PESTAÑAS SEGÚN ROL
 # =============================================
 if st.session_state.role == "admin":
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "Evaluación Individual", "Carga Masiva", "Historial", "Gestión Doctores", "Estadísticas Admin"
-    ])
+    tabs = st.tabs(["📋 Evaluación Individual", "📤 Carga Masiva", "📊 Historial", "👥 Gestión Doctores", "📈 Estadísticas"])
+    tab1, tab2, tab3, tab4, tab5 = tabs
 else:
-    tab1, tab2, tab3 = st.tabs(["Evaluación Individual", "Carga Masiva", "Historial"])
+    tabs = st.tabs(["📋 Evaluación Individual", "📤 Carga Masiva", "📊 Historial"])
+    tab1, tab2, tab3 = tabs
 
-# ---------- INDIVIDUAL ----------
+# =============================================
+# TAB 1: EVALUACIÓN INDIVIDUAL
+# =============================================
 with tab1:
-    st.subheader("Evaluación Individual")
-    with st.form("individual"):
-        nombre = st.text_input("Nombre completo del paciente")
-        c1,c2 = st.columns(2)
-        with c1:
-            edad = st.number_input("Edad",18,120,55)
-            imc  = st.number_input("IMC",10.0,60.0,27.0,0.1)
-            glucosa = st.number_input("Glucosa ayunas (mg/dL)",50,500,110)
-        with c2:
-            presion = st.number_input("Presión sistólica (mmHg)",80,250,130)
-            creat = st.number_input("Creatinina (mg/dL)",0.1,15.0,1.2,0.01)
-
-        if st.form_submit_button("Calcular Riesgo"):
+    st.subheader("📋 Evaluación Individual de Paciente")
+    
+    col_form, col_result = st.columns([1, 1])
+    
+    with col_form:
+        st.markdown("#### Datos del Paciente")
+        with st.form("form_individual", clear_on_submit=False):
+            nombre = st.text_input("👤 Nombre completo del paciente", placeholder="Ej: Juan Pérez García")
+            
+            st.markdown("##### Datos Clínicos")
+            c1, c2 = st.columns(2)
+            with c1:
+                edad = st.number_input("📅 Edad (años)", 18, 120, 55)
+                imc = st.number_input("⚖️ IMC (kg/m²)", 10.0, 60.0, 27.0, 0.1)
+                glucosa = st.number_input("🩸 Glucosa ayunas (mg/dL)", 50, 500, 110)
+            with c2:
+                presion = st.number_input("💓 Presión sistólica (mmHg)", 80, 250, 130)
+                creatinina = st.number_input("🧪 Creatinina (mg/dL)", 0.1, 15.0, 1.2, 0.01)
+            
+            calcular = st.form_submit_button("🔬 Calcular Riesgo", use_container_width=True)
+    
+    with col_result:
+        if calcular:
             if not nombre.strip():
-                st.error("El nombre es obligatorio")
+                st.error("⚠️ El nombre del paciente es obligatorio")
             else:
-                riesgo = predecir({"edad":edad,"imc":imc,"presion_sistolica":presion,
-                                  "glucosa_ayunas":glucosa,"creatinina":creat})
-                nivel, color, reco = riesgo_level(riesgo)
-                record = {
-                    "nombre_paciente": nombre, "doctor_user": st.session_state.username,
-                    "doctor_name": st.session_state.doctor_name, "timestamp": datetime.now().isoformat(),
-                    "edad":edad, "imc":imc, "presion_sistolica":presion,
-                    "glucosa_ayunas":glucosa, "creatinina":creat, "riesgo":riesgo, "nivel":nivel
+                # Calcular riesgo
+                datos_paciente = {
+                    "edad": edad, "imc": imc, "presion_sistolica": presion,
+                    "glucosa_ayunas": glucosa, "creatinina": creatinina
                 }
-                db.add_patient(record)
-                st.session_state.ultimo_paciente = record
-                st.rerun()
-
-    if "ultimo_paciente" in st.session_state:
-        p = st.session_state.ultimo_paciente
-        nivel, color, _ = riesgo_level(p["riesgo"])
-        st.markdown(f"<div style='text-align:center;padding:30px;background:#f9f9f9;border:5px solid {color};border-radius:15px'>"
-                   f"<h2 style='color:{color}'>{nivel}</h2>"
-                   f"<h1 style='font-size:5rem;color:{color}'>{p['riesgo']:.1f}%</h1>"
-                   f"<p><strong>Recomendación:</strong> {riesgo_level(p['riesgo'])[2]}</p></div>", 
-                   unsafe_allow_html=True)
-
-        pdf = generar_pdf_html(p, p['riesgo'], nivel, st.session_state.doctor_name)
-        st.download_button("Descargar Reporte PDF", pdf, 
-                          file_name=f"Reporte_{p['nombre_paciente'].replace(' ','_')}.html",
-                          mime="text/html")
-
-# ---------- CARGA MASIVA ----------
-with tab2:
-    st.subheader("Carga Masiva desde Excel/CSV")
-    plantilla = pd.DataFrame({
-        "nombre_paciente":["Juan Pérez","María López"],
-        "edad":[60,55],"imc":[29.5,31.2],
-        "presion_sistolica":[150,140],
-        "glucosa_ayunas":[180,95],
-        "creatinina":[1.8,1.1]
-    })
-    csv = plantilla.to_csv(index=False).encode()
-    st.download_button("Descargar Plantilla CSV", csv, "plantilla_nefropredict.csv", "text/csv")
-
-    uploaded_file = st.file_uploader("Subir archivo", type=["csv","xlsx"])
-    if uploaded_file:
-        df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file)
-        req = ["nombre_paciente","edad","imc","presion_sistolica","glucosa_ayunas","creatinina"]
-        if not all(c in df.columns for c in req):
-            st.error("Faltan columnas obligatorias")
-        else:
-            df["riesgo"] = df.apply(predecir, axis=1)
-            df["nivel"], df["color"], df["reco"] = zip(*df["riesgo"].apply(riesgo_level))
-
-            for _, r in df.iterrows():
-                db.add_patient({
-                    "nombre_paciente": r["nombre_paciente"],
+                riesgo = predecir(datos_paciente)
+                nivel, color, recomendacion = riesgo_level(riesgo)
+                
+                # Guardar en base de datos
+                record = {
+                    "nombre_paciente": nombre,
                     "doctor_user": st.session_state.username,
                     "doctor_name": st.session_state.doctor_name,
                     "timestamp": datetime.now().isoformat(),
-                    "edad": int(r["edad"]), "imc": float(r["imc"]),
-                    "presion_sistolica": int(r["presion_sistolica"]),
-                    "glucosa_ayunas": int(r["glucosa_ayunas"]),
-                    "creatinina": float(r["creatinina"]),
-                    "riesgo": float(r["riesgo"]), "nivel": r["nivel"]
-                })
+                    "edad": edad, "imc": imc, "presion_sistolica": presion,
+                    "glucosa_ayunas": glucosa, "creatinina": creatinina,
+                    "riesgo": riesgo, "nivel": nivel
+                }
+                db.add_patient(record)
+                
+                # Guardar en session_state para mostrar
+                st.session_state.ultimo_resultado = record
+        
+        # Mostrar resultado si existe
+        if "ultimo_resultado" in st.session_state:
+            p = st.session_state.ultimo_resultado
+            nivel, color, recomendacion = riesgo_level(p["riesgo"])
+            
+            st.markdown("#### 📊 Resultado del Análisis")
+            
+            # Gráfico de gauge
+            st.plotly_chart(crear_gauge_riesgo(p["riesgo"]), use_container_width=True)
+            
+            # Tarjeta de resultado
+            if p["riesgo"] > 70:
+                st.markdown(f"""<div class="risk-high">
+                    <h2>⚠️ RIESGO {nivel}</h2>
+                    <h1 style="font-size:3em">{p["riesgo"]:.1f}%</h1>
+                    <p>{recomendacion}</p>
+                </div>""", unsafe_allow_html=True)
+            elif p["riesgo"] > 40:
+                st.markdown(f"""<div class="risk-med">
+                    <h2>⚡ RIESGO {nivel}</h2>
+                    <h1 style="font-size:3em">{p["riesgo"]:.1f}%</h1>
+                    <p>{recomendacion}</p>
+                </div>""", unsafe_allow_html=True)
+            else:
+                st.markdown(f"""<div class="risk-low">
+                    <h2>✅ RIESGO {nivel}</h2>
+                    <h1 style="font-size:3em">{p["riesgo"]:.1f}%</h1>
+                    <p>{recomendacion}</p>
+                </div>""", unsafe_allow_html=True)
+            
+            # Gráfico de factores
+            st.plotly_chart(crear_grafico_factores(p), use_container_width=True)
+            
+            # Botón para descargar/imprimir reporte
+            reporte_html = generar_reporte_html(p, p["riesgo"], nivel, st.session_state.doctor_name)
+            st.download_button(
+                "🖨️ Descargar/Imprimir Reporte",
+                reporte_html,
+                file_name=f"Reporte_{p['nombre_paciente'].replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.html",
+                mime="text/html",
+                use_container_width=True
+            )
 
-            urgente = len(df[df["riesgo"]>70])
-            medio   = len(df[(df["riesgo"]>40) & (df["riesgo"]<=70)])
-            bajo    = len(df[df["riesgo"]<=40])
+# =============================================
+# TAB 2: CARGA MASIVA
+# =============================================
+with tab2:
+    st.subheader("📤 Carga Masiva desde Excel/CSV")
+    
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        st.markdown("#### 📥 Descargar Plantilla")
+        plantilla = pd.DataFrame({
+            "nombre_paciente": ["Juan Pérez", "María López", "Carlos Rodríguez"],
+            "edad": [60, 55, 72],
+            "imc": [29.5, 31.2, 26.8],
+            "presion_sistolica": [150, 140, 165],
+            "glucosa_ayunas": [180, 95, 220],
+            "creatinina": [1.8, 1.1, 2.3]
+        })
+        csv = plantilla.to_csv(index=False).encode('utf-8')
+        st.download_button("⬇️ Descargar Plantilla CSV", csv, "plantilla_nefropredict.csv", "text/csv", use_container_width=True)
+        
+        st.markdown("---")
+        st.markdown("#### 📤 Subir Archivo")
+        uploaded_file = st.file_uploader("Seleccionar archivo", type=["csv", "xlsx"])
+    
+    with col2:
+        if uploaded_file:
+            try:
+                df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file)
+                req_cols = ["nombre_paciente", "edad", "imc", "presion_sistolica", "glucosa_ayunas", "creatinina"]
+                
+                if not all(c in df.columns for c in req_cols):
+                    st.error(f"❌ Faltan columnas. Requeridas: {', '.join(req_cols)}")
+                else:
+                    # Calcular riesgo para todos
+                    df["riesgo"] = df.apply(predecir, axis=1)
+                    df["nivel"] = df["riesgo"].apply(lambda x: riesgo_level(x)[0])
+                    df["recomendacion"] = df["riesgo"].apply(lambda x: riesgo_level(x)[2])
+                    
+                    # Guardar en BD
+                    for _, r in df.iterrows():
+                        db.add_patient({
+                            "nombre_paciente": r["nombre_paciente"],
+                            "doctor_user": st.session_state.username,
+                            "doctor_name": st.session_state.doctor_name,
+                            "timestamp": datetime.now().isoformat(),
+                            "edad": int(r["edad"]), "imc": float(r["imc"]),
+                            "presion_sistolica": int(r["presion_sistolica"]),
+                            "glucosa_ayunas": int(r["glucosa_ayunas"]),
+                            "creatinina": float(r["creatinina"]),
+                            "riesgo": float(r["riesgo"]), "nivel": r["nivel"]
+                        })
+                    
+                    # Log de carga
+                    db.add_upload_log({
+                        "doctor_user": st.session_state.username,
+                        "doctor_name": st.session_state.doctor_name,
+                        "timestamp": datetime.now().isoformat(),
+                        "cantidad": len(df)
+                    })
+                    
+                    # Métricas
+                    urgente = len(df[df["riesgo"] > 70])
+                    medio = len(df[(df["riesgo"] > 40) & (df["riesgo"] <= 70)])
+                    bajo = len(df[df["riesgo"] <= 40])
+                    
+                    st.success(f"✅ Procesados {len(df)} pacientes exitosamente")
+                    
+                    m1, m2, m3 = st.columns(3)
+                    m1.metric("🔴 Intervención URGENTE", urgente)
+                    m2.metric("🟡 Intervención Media", medio)
+                    m3.metric("🟢 Seguimiento Rutinario", bajo)
+                    
+                    # Gráfico de distribución
+                    fig_pie = px.pie(
+                        values=[urgente, medio, bajo],
+                        names=['Urgente (>70%)', 'Medio (40-70%)', 'Bajo (<40%)'],
+                        color_discrete_sequence=['#CE1126', '#FFC400', '#4CAF50'],
+                        title="Distribución de Riesgo"
+                    )
+                    st.plotly_chart(fig_pie, use_container_width=True)
+                    
+                    # Tabla de resultados
+                    st.dataframe(
+                        df[["nombre_paciente", "edad", "creatinina", "riesgo", "nivel"]].sort_values("riesgo", ascending=False),
+                        use_container_width=True,
+                        hide_index=True
+                    )
+            except Exception as e:
+                st.error(f"❌ Error al procesar archivo: {str(e)}")
 
-            st.success(f"Procesados {len(df)} pacientes")
-            c1,c2,c3 = st.columns(3)
-            c1.metric("Intervención URGENTE", urgente, delta="Prioridad 1")
-            c2.metric("Intervención Media", medio)
-            c3.metric("Seguimiento rutinario", bajo)
-
-            st.dataframe(df[["nombre_paciente","riesgo","nivel","reco"]].sort_values("riesgo", ascending=False))
-
-# ---------- HISTORIAL ----------
+# =============================================
+# TAB 3: HISTORIAL
+# =============================================
 with tab3:
-    st.subheader("Historial Clínico")
-    pacientes = db.get_patients_by_doctor(st.session_state.username) if st.session_state.role=="doctor" else db.get_all_patients()
-    if pacientes:
-        dfp = pd.DataFrame(pacientes)
-        nombres = dfp["nombre_paciente"].unique()
-        sel = st.selectbox("Paciente", opciones)
-        if sel:
-            hist = dfp[dfp["nombre_paciente"]==sel].sort_values("timestamp")
-            st.dataframe(hist[["timestamp","riesgo","nivel","creatinina"]], use_container_width=True)
-            chart = alt.Chart(hist).mark_line(point=True).encode(
-                x="timestamp:T", y="riesgo:Q", color=alt.value("#002868"), tooltip=["timestamp","riesgo"]
-            ).properties(height=300)
-            st.altair_chart(chart, use_container_width=True)
+    st.subheader("📊 Historial Clínico")
+    
+    # Obtener pacientes según rol
+    if st.session_state.role == "doctor":
+        pacientes = db.get_patients_by_doctor(st.session_state.username)
     else:
-        st.info("Aún no hay registros")
-
-# ---------- ADMIN: GESTIÓN DOCTORES ----------
-if st.session_state.role == "admin":
-    with tab4:
-        st.subheader("Gestión de Doctores")
-        with st.expander("Crear nuevo doctor", expanded=True):
-            with st.form("nuevo"):
-                nu = st.text_input("Usuario (sin espacios)").lower()
-                npwd = st.text_input("Contraseña", type="password")
-                nnombre = st.text_input("Nombre completo")
-                if st.form_submit_button("Crear"):
-                    if db.get_user(nu):
-                        st.error("Ya existe")
-                    else:
-                        db.create_doctor(nu, npwd, nnombre)
-                        st.success("Creado")
-                        st.rerun()
-
-        for user, info in db.data["users"].items():
-            if info["role"] == "doctor":
-                with st.expander(f"{info['name']} (@{user}) → {'Activo' if info['active'] else 'Inactivo'}"):
-                    c1,c2 = st.columns(2)
-                    with c1:
-                        nueva_pass = st.text_input("Nueva contraseña", type="password", key=f"p{user}")
-                        if st.button("Cambiar contraseña", key=f"c{user}"):
-                            db.update_password(user, nueva_pass)
-                            st.success("Contraseña cambiada")
-                    with c2:
-                        if st.button("Activar/Desactivar", key=f"t{user}"):
-                            db.toggle_active(user)
-                            st.rerun()
-                        if st.button("Eliminar doctor", key=f"d{user}", type="primary"):
-                            db.delete_doctor(user)
-                            st.rerun()
-
-    # ---------- ADMIN: ESTADÍSTICAS ----------
-    with tab5:
-        st.subheader("Doctores más activos")
-        if db.data["uploads"]:
-            dfu = pd.DataFrame(db.data["uploads"])
-            top = dfu["doctor_name"].value_counts()
-            st.bar_chart(top)
-        else:
-            st.info("Aún no hay cargas masivas")
-
-st.caption("NefroPredict RD © 2025 • Versión FINAL 100% funcional y segura")
+        pacientes = db.get_all_patients()
+    
+    if pacientes:
+        dfp = p
