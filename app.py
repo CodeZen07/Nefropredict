@@ -751,7 +751,7 @@ if st.session_state.role == "admin":
                     
                     # Ver pacientes de este doctor
                     st.markdown("---")
-                    st.markdown(f"##### 📁 Pacientes de {info_sel['name']}")
+                    st.markdown(f"##### 📁 Pacientes de {info_sel.get('name', user_sel)}")
                     pacientes_doctor = db.get_patients_by_doctor(user_sel)
                     if pacientes_doctor:
                         df_pac = pd.DataFrame(pacientes_doctor)
