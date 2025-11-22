@@ -11,9 +11,6 @@ import io
 st.set_page_config(page_title="NefroPredict RD", page_icon="🫘", layout="wide")
 
 # --- 0. CLASE DE PERSISTENCIA SIMULADA (REEMPLAZO DE FIRESTORE) ---
-# Esta clase simula la conexión y las operaciones CRUD de Firestore.
-# Usamos un archivo JSON local para que los datos persistan entre interacciones de Streamlit.
-
 DB_FILE_PATH = "nefro_db.json"
 
 class DataStore:
@@ -43,16 +40,13 @@ class DataStore:
         """Lee todos los datos del archivo DB."""
         if not os.path.exists(self.file_path):
             self._initialize_db()
-        # Agregar manejo de errores para archivos JSON vacíos o malformados
         try:
             with open(self.file_path, 'r') as f:
                 return json.load(f)
         except json.JSONDecodeError:
-            # Si el archivo está vacío o malformado, reinicializar con datos por defecto
             self._initialize_db()
             with open(self.file_path, 'r') as f:
                 return json.load(f)
-
 
     def _write_db(self, data):
         """Escribe todos los datos al archivo DB."""
@@ -92,7 +86,7 @@ class DataStore:
     def add_file_record(self, record):
         """Añade un nuevo registro de archivo al historial."""
         db = self._read_db()
-        db['file_history'].insert(0, record) # Insertar al inicio para que el más reciente salga primero
+        db['file_history'].insert(0, record) 
         self._write_db(db)
 
 # Inicializamos el DataStore (simulando la conexión a Firestore)
@@ -180,26 +174,30 @@ with col_logout:
 st.markdown("---")
 
 # --- 3. FUNCIONES DE GESTIÓN (Para Admin Panel) ---
-def create_new_user_db(username, password):
+def create_new_user_db(username, password, role="doctor"):
+    """Crea un nuevo usuario en la DB (DataStore)."""
     if db_store.get_user(username):
         return False, "Ese nombre de usuario ya existe."
     
-    user_id = f"dr_{username}_uid_{int(time.time())}"
-    user_data = {"pwd": password, "role": "doctor", "id": user_id, "active": True}
+    user_id = f"{role}_{username}_uid_{int(time.time())}"
+    user_data = {"pwd": password, "role": role, "id": user_id, "active": True}
     db_store.create_user(username, user_data)
-    return True, f"Médico '{username}' creado con éxito (ID: {user_id})."
+    return True, f"Usuario '{username}' ({role.capitalize()}) creado con éxito (ID: {user_id})."
 
 def update_user_status_db(username, is_active):
+    """Actualiza el estado 'active' de un usuario en la DB (DataStore)."""
     user_data = db_store.get_user(username)
     if user_data and user_data['role'] == 'doctor':
         return db_store.update_user(username, {'active': is_active})
     return False
 
 def get_doctors_db():
+    """Obtiene la lista de todos los médicos (no admin) de la DB."""
     all_users = db_store.get_all_users()
     return {k: v for k, v in all_users.items() if v['role'] == 'doctor'}
 
 def get_global_history_db():
+    """Obtiene todo el historial de archivos de la DB."""
     return db_store.get_file_history()
 
 
@@ -214,7 +212,6 @@ def predict_risk(data_series):
         return (prediction_proba * 100).round(1)
     else:
         # Simulación de riesgo
-        # Factor base + ajustes por variables
         base_risk = 30.0 
         adjustment = (data['creatinina'].iloc[0] * 10) + \
                      (data['glucosa_ayunas'].iloc[0] * 0.1) + \
@@ -224,9 +221,7 @@ def predict_risk(data_series):
         return max(1.0, min(99.9, simulated_risk)).round(1)
 
 def generate_explanation_data(row):
-    """
-    Simula la contribución de cada característica al riesgo (como los valores SHAP).
-    """
+    """Simula la contribución de cada característica al riesgo (como los valores SHAP)."""
     contributions = {}
     
     # Valores de referencia de riesgo (umbrales simplificados)
@@ -258,22 +253,19 @@ def generate_explanation_data(row):
 
     total_abs = sum(abs(v) for v in contributions.values())
     if total_abs > 0:
-        # Normalización para que se visualice bien
         contributions = {k: v / total_abs for k, v in contributions.items()}
 
     return contributions
 
-# Función para generar gráficos interactivos (similar a la anterior, pero limpia para reuso)
 def display_explanation_charts(data):
     """Muestra los datos de contribución como un gráfico de barras horizontal (interactivo)."""
     
-    # Convertir a DataFrame para chart interactivo (Altair/Streamlit)
     df_chart = pd.DataFrame(data.items(), columns=['Factor', 'Contribucion_Normalizada'])
-    df_chart['Color'] = np.where(df_chart['Contribucion_Normalizada'] > 0, 'Riesgo Alto', 'Riesgo Bajo')
+    df_chart['Riesgo_Impacto'] = np.where(df_chart['Contribucion_Normalizada'] > 0, 'Aumenta Riesgo', 'Disminuye Riesgo')
 
-    # Usar st.bar_chart para un gráfico interactivo
     st.markdown("#### 📈 Contribución Individual de Factores")
-    st.bar_chart(df_chart, x='Factor', y='Contribucion_Normalizada', color='Color', use_container_width=True)
+    # Streamlit usa Altair, que maneja la interacción
+    st.bar_chart(df_chart, x='Factor', y='Contribucion_Normalizada', color='Riesgo_Impacto', use_container_width=True)
     st.markdown("<p style='font-size: 0.8em; text-align: center; color: #888;'>Las barras rojas representan un factor que aumenta el riesgo. Las barras verdes lo disminuyen.</p>", unsafe_allow_html=True)
 
 
@@ -293,7 +285,6 @@ def generate_individual_report_html(patient_data, risk_percentage, doctor_name, 
     nivel, color, recomendacion = get_risk_level(risk_percentage)
     now = time.strftime("%Y-%m-%d %H:%M:%S")
 
-    # Convertir explicación a tabla HTML
     explanation_rows = ""
     for factor, contrib in explanation_data.items():
         contrib_text = f"{abs(contrib*100):.1f}%"
@@ -391,7 +382,7 @@ def generate_individual_report_html(patient_data, risk_percentage, doctor_name, 
     return html_content
 
 
-# --- 6. FUNCIÓN DE LA PLANTILLA EXCEL ---
+# --- 6. FUNCIÓN DE LA PLANTILLA EXCEL (Fix de Motor) ---
 
 def get_excel_template():
     """Genera la plantilla Excel recomendada para la carga masiva."""
@@ -405,43 +396,30 @@ def get_excel_template():
     }
     df_template = pd.DataFrame(data)
     
-    # Crear un buffer de Bytes para guardar el archivo en memoria
+    # FIX: Cambiando el motor a 'openpyxl' para evitar ModuleNotFoundError
     output = io.BytesIO()
-    writer = pd.ExcelWriter(output, engine='xlsxwriter')
+    # Usamos openpyxl, que es más común en entornos Streamlit que xlsxwriter
+    writer = pd.ExcelWriter(output, engine='openpyxl') 
     df_template.to_excel(writer, index=False, sheet_name='Plantilla_ERC')
-    
-    # Instrucciones de la plantilla (simuladas en la primera celda)
-    # Nota: Streamlit no soporta comentarios fácilmente en xlsx, por lo que incluimos solo los datos.
     writer.close()
     processed_data = output.getvalue()
     return processed_data
 
 
-# --- 7. PANEL DE ADMINISTRACIÓN (SOLO PARA ADMIN) ---
-# Se mantiene igual, pero movido al final para priorizar el flujo de trabajo del doctor.
-
-if st.session_state.user_role == 'admin':
-    # Lógica del panel de administración (omitiendo código por longitud, se mantiene funcional)
-    pass # El código Admin se mantiene, pero solo se ejecuta si el rol es 'admin'
-
-
-# --- 8. Interfaz del Médico (La nueva estructura de pestañas) ---
-
+# --- 7. Interfaz del Médico (Estructura de pestañas) ---
 if st.session_state.user_role == 'doctor' or st.session_state.user_role == 'admin':
     
     st.subheader("Selección de Modo de Evaluación")
     
-    # Navegación por pestañas (Opción 1)
     tab_individual, tab_masiva, tab_historial = st.tabs(["🩺 Predicción Individual", "📁 Carga Masiva (Excel)", "⏱️ Mi Historial"])
 
     # =================================================================
-    # 8.1 PESTAÑA DE PREDICCIÓN INDIVIDUAL
+    # 7.1 PESTAÑA DE PREDICCIÓN INDIVIDUAL
     # =================================================================
     with tab_individual:
         st.markdown("#### Ingreso de Datos de un Único Paciente")
         st.info("Ingresa los 5 biomarcadores clave para obtener un riesgo instantáneo y un reporte descargable.")
         
-        # Formulario de entrada
         with st.form("individual_patient_form"):
             col_id, col_edad = st.columns(2)
             with col_id:
@@ -469,30 +447,21 @@ if st.session_state.user_role == 'doctor' or st.session_state.user_role == 'admi
                     'creatinina': creatinina
                 })
                 
-                # Calcular el riesgo
                 risk_percentage = predict_risk(patient_data)
-                nivel, color, recomendacion = get_risk_level(risk_percentage)
                 explanation_data = generate_explanation_data(patient_data)
 
-                # Guardar datos en la sesión para el reporte
                 st.session_state.last_individual_report = {
                     'data': patient_data.to_dict(),
                     'risk': risk_percentage,
                     'explanation': explanation_data,
-                    'nivel': nivel,
-                    'color': color,
-                    'recomendacion': recomendacion
                 }
-
                 st.success(f"Cálculo completado para {id_paciente}.")
-                st.rerun() # Trigger rerun para mostrar los resultados fuera del form
+                st.rerun() 
 
-        # Mostrar resultados después de la presentación del formulario (si existen)
         if 'last_individual_report' in st.session_state:
             report_data = st.session_state.last_individual_report
             risk_percentage = report_data['risk']
-            color = report_data['color']
-            nivel = report_data['nivel']
+            nivel, color, _ = get_risk_level(risk_percentage)
             
             st.markdown("---")
             st.markdown("### 3. Resultados y Reporte Instantáneo")
@@ -507,16 +476,13 @@ if st.session_state.user_role == 'doctor' or st.session_state.user_role == 'admi
 
             st.markdown("---")
             
-            # Gráfico interactivo
             display_explanation_charts(report_data['explanation'])
             
             st.markdown("---")
             
-            # Reporte descargable (Guardar como PDF)
             st.markdown("### 4. Generar Documento Imprimible (PDF)")
             st.warning("Pulsa el botón, y luego usa la opción 'Imprimir' y selecciona 'Guardar como PDF' en tu navegador.")
             
-            # Generar HTML del reporte
             html_report = generate_individual_report_html(
                 report_data['data'], 
                 risk_percentage, 
@@ -524,7 +490,6 @@ if st.session_state.user_role == 'doctor' or st.session_state.user_role == 'admi
                 report_data['explanation']
             )
 
-            # Botón que llama a una función JavaScript de impresión (se requiere HTML para el JS)
             st.components.v1.html(
                 f"""
                 <button onclick="window.printReport()" style="background-color: #002868; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 1.1em;">
@@ -537,7 +502,7 @@ if st.session_state.user_role == 'doctor' or st.session_state.user_role == 'admi
 
 
     # =================================================================
-    # 8.2 PESTAÑA DE CARGA MASIVA (EXCEL)
+    # 7.2 PESTAÑA DE CARGA MASIVA (EXCEL)
     # =================================================================
     with tab_masiva:
         st.markdown("#### Carga de Archivo Excel para Lotes de Pacientes")
@@ -569,10 +534,8 @@ if st.session_state.user_role == 'doctor' or st.session_state.user_role == 'admi
                      st.error(f"⚠️ Error: Faltan las siguientes columnas requeridas en tu Excel: {', '.join(missing_cols)}. Por favor, revisa el formato.")
                      st.stop()
                 
-                # Aplicar predicción a todo el DataFrame
                 df['Riesgo_ERC_5años_%'] = df.apply(lambda row: predict_risk(row), axis=1)
 
-                # --- REGISTRO DE ARCHIVO EN DB ---
                 now = time.strftime("%Y-%m-%d %H:%M:%S")
                 record = {
                     "usuario": st.session_state.username,
@@ -582,9 +545,7 @@ if st.session_state.user_role == 'doctor' or st.session_state.user_role == 'admi
                     "patients": len(df)
                 }
                 db_store.add_file_record(record)
-                # --------------------------------
 
-                # --- 6. Presentación de Resultados Masivos ---
                 st.subheader("2. Resultados Predictivos y Clasificación")
 
                 total_alto_riesgo = len(df[df['Riesgo_ERC_5años_%'] > 70])
@@ -597,7 +558,6 @@ if st.session_state.user_role == 'doctor' or st.session_state.user_role == 'admi
 
                 st.markdown("---")
                 
-                # Mostrar tabla resumida de resultados
                 st.markdown("#### Vista Previa de Riesgos Calculados (Top 50)")
                 df_display = df.sort_values(by='Riesgo_ERC_5años_%', ascending=False).head(50)
                 df_display['Recomendacion'] = df_display['Riesgo_ERC_5años_%'].apply(lambda x: get_risk_level(x)[0])
@@ -606,7 +566,6 @@ if st.session_state.user_role == 'doctor' or st.session_state.user_role == 'admi
 
                 st.markdown("---")
 
-                # --- 7. Descarga de resultados ---
                 st.subheader("3. Exportar Datos Masivos")
                 csv = df.to_csv(index=False).encode('utf-8')
                 st.download_button(
@@ -626,7 +585,7 @@ if st.session_state.user_role == 'doctor' or st.session_state.user_role == 'admi
 
 
     # =================================================================
-    # 8.3 PESTAÑA DE MI HISTORIAL
+    # 7.3 PESTAÑA DE MI HISTORIAL
     # =================================================================
     with tab_historial:
         st.markdown("#### Archivos Subidos por Ti")
@@ -641,26 +600,130 @@ if st.session_state.user_role == 'doctor' or st.session_state.user_role == 'admi
         if current_user_history:
             history_df = pd.DataFrame(current_user_history)
             st.dataframe(history_df[['timestamp', 'filename', 'patients']], use_container_width=True, hide_index=True)
-            st.caption("Esta información es persistente. En un entorno real, se leería de tu ruta de usuario en Firestore.")
+            st.caption("Esta información es persistente.")
         else:
             st.info("No has subido ningún archivo aún.")
 
-# --- 9. PANEL DE ADMINISTRACIÓN (Mantenido) ---
+# --- 8. PANEL DE ADMINISTRACIÓN (SOLO PARA ADMIN - Restaurado) ---
 if st.session_state.user_role == 'admin':
-    # Este bloque contendría toda la lógica del Panel de Administración,
-    # incluyendo Dashboard, Gestión de Médicos e Historial Global.
-    # Se recomienda mantenerlo en un bloque separado para organización.
     st.markdown("---")
-    st.subheader("⚙️ Panel de Administración (Detalle abajo)")
+    st.markdown("<h2 style='color:#CE1126;'>⚙️ Panel de Administración y Gestión</h2>", unsafe_allow_html=True)
+    
+    tab_dashboard, tab_users, tab_files = st.tabs(["Dashboard de Uso", "Gestión de Médicos", "Historial Global"])
 
-    # Implementación detallada del Admin Panel aquí...
-    # (Se omite el código completo para mantener el enfoque en la UI del doctor, 
-    # pero las funciones de gestión están definidas y listas para usarse).
+    # --- TAB 1: DASHBOARD DE USO (KPIs) ---
+    with tab_dashboard:
+        st.markdown("#### 📊 Dashboard de Uso (KPIs)")
+        
+        df_history = pd.DataFrame(get_global_history_db())
+        
+        if not df_history.empty:
+            
+            total_files = len(df_history)
+            total_patients_evaluated = df_history['patients'].sum()
+            
+            col_kpi1, col_kpi2, col_kpi3 = st.columns(3)
+            
+            col_kpi1.metric("Total Histórico de Pacientes Evaluados", f"{total_patients_evaluated:,}")
+            col_kpi2.metric("Archivos Totales Procesados", total_files)
+            
+            all_doctors = get_doctors_db()
+            active_doctors = sum(1 for d in all_doctors.values() if d.get('active', True))
+            inactive_doctors = len(all_doctors) - active_doctors
+            col_kpi3.metric("Médicos Activos", active_doctors, delta=-inactive_doctors, delta_color="inverse")
+            
+            st.markdown("---")
+            st.markdown("#### 📈 Top 5 Médicos por Uso (Pacientes Evaluados)")
+            
+            usage_by_doctor = df_history.groupby('usuario')['patients'].sum().sort_values(ascending=False).head(5)
+            st.bar_chart(usage_by_doctor, color="#002868") # Azul RD
+        else:
+            st.info("No hay datos históricos para mostrar métricas.")
+
+
+    # --- TAB 2: GESTIÓN DE MÉDICOS ---
+    with tab_users:
+        col_add, col_list = st.columns(2)
+        
+        with col_add:
+            st.markdown("#### ➕ Crear Nuevo Médico")
+            st.info("Nota: Los usuarios creados aquí serán persistentes.")
+            
+            # Formulario para añadir médico
+            new_user = st.text_input("Nombre de Usuario del Nuevo Médico", key="new_user_input").lower()
+            new_pwd = st.text_input("Contraseña Temporal", type="password", key="new_pwd_input")
+            if st.button("Crear Médico y Acceso", key="btn_create_user"):
+                if new_user and new_pwd:
+                    success, message = create_new_user_db(new_user, new_pwd, role="doctor")
+                    if success:
+                        st.success(message)
+                        st.rerun()
+                    else:
+                        st.error(message)
+                else:
+                    st.warning("Debes llenar ambos campos.")
+                    
+        with col_list:
+            st.markdown("#### 📋 Listado de Médicos")
+            doctors = get_doctors_db()
+            
+            if doctors:
+                doctor_list = [{"Usuario": user, "ID de Sistema": details['id'], "Estado": "✅ Activo" if details.get('active', True) else "🚫 Inactivo"} for user, details in doctors.items()]
+                st.dataframe(pd.DataFrame(doctor_list), use_container_width=True, hide_index=True)
+                st.caption(f"Total de Médicos: {len(doctors)}")
+            else:
+                st.info("Aún no hay médicos registrados.")
+
+            st.markdown("---")
+            st.markdown("#### 🚫 Suspender/Activar Cuentas")
+            
+            # Lógica para suspender/activar
+            if doctors:
+                doctor_names = sorted([k for k, v in doctors.items() if v['role'] == 'doctor'])
+                
+                user_to_manage = st.selectbox("Selecciona un Médico para Gestionar", doctor_names, key="user_to_manage")
+                
+                selected_doctor_data = db_store.get_user(user_to_manage)
+                current_status_bool = selected_doctor_data.get('active', True)
+                
+                default_index = 0 if current_status_bool else 1 
+                
+                new_status = st.radio(
+                    "Estado de la Cuenta", 
+                    ["Activo", "Inactivo"], 
+                    index=default_index,
+                    key="status_radio"
+                )
+                
+                if st.button("Aplicar Cambio de Estado", key="btn_update_status"):
+                    is_active = (new_status == "Activo")
+                    if update_user_status_db(user_to_manage, is_active):
+                        st.success(f"Estado de '{user_to_manage}' actualizado a: {new_status}")
+                        st.rerun()
+                    else:
+                        st.error("Error al actualizar el estado del usuario.")
+            else:
+                st.info("No hay médicos para gestionar.")
+
+
+    # --- TAB 3: HISTORIAL GLOBAL DE ARCHIVOS ---
+    with tab_files:
+        st.markdown("#### 📁 Archivos Subidos por Todos los Médicos")
+        st.info("Vista global de auditoría de uso de la plataforma. (Simula la 'Colección Pública').")
+        
+        all_history_df = pd.DataFrame(get_global_history_db())
+        
+        if not all_history_df.empty:
+            cols = ['usuario', 'timestamp', 'filename', 'patients']
+            display_df = all_history_df[cols].sort_values(by='timestamp', ascending=False)
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("Aún no hay ningún archivo subido por ningún usuario.")
     
     st.markdown("---")
-    st.info("El Panel de Administración ha sido movido al final para simplificar el flujo del doctor.")
+# --- FIN PANEL DE ADMINISTRACIÓN ---
 
 
-# --- 10. Footer ---
+# --- 9. Footer ---
 st.markdown("---")
-st.markdown("<p style='text-align: center; color:#002868; font-weight:bold;'>© 2025 NefroPredict RD - Soluciones de salud impulsadas por IA</p>", unsafe_allow_html=True)           
+st.markdown("<p style='text-align: center; color:#002868; font-weight:bold;'>© 2025 NefroPredict RD - Soluciones de salud impulsadas por IA</p>", unsafe_allow_html=True)
