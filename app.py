@@ -651,62 +651,209 @@ with tab3:
 # =============================================
 if st.session_state.role == "admin":
     with tab4:
-        st.subheader("👥 Gestión de Doctores")
+        st.subheader("👥 Panel de Administración de Usuarios")
         
-        col1, col2 = st.columns([1, 2])
+        # Sub-tabs dentro del panel admin
+        admin_tab1, admin_tab2, admin_tab3 = st.tabs(["📋 Ver/Gestionar Doctores", "➕ Crear Doctor", "📊 Actividad y Archivos"])
         
-        with col1:
-            st.markdown("#### ➕ Crear Nuevo Doctor")
-            with st.form("form_nuevo_doctor"):
-                nuevo_user = st.text_input("Usuario (sin espacios)").lower().strip()
-                nuevo_pwd = st.text_input("Contraseña", type="password")
-                nuevo_nombre = st.text_input("Nombre completo")
-                
-                if st.form_submit_button("✅ Crear Doctor", use_container_width=True):
-                    if not nuevo_user or not nuevo_pwd or not nuevo_nombre:
-                        st.error("Todos los campos son obligatorios")
-                    elif db.get_user(nuevo_user):
-                        st.error("El usuario ya existe")
-                    elif " " in nuevo_user:
-                        st.error("El usuario no puede tener espacios")
-                    else:
-                        db.create_doctor(nuevo_user, nuevo_pwd, nuevo_nombre)
-                        st.success(f"✅ Doctor {nuevo_nombre} creado exitosamente")
-                        st.rerun()
-        
-        with col2:
-            st.markdown("#### 📋 Doctores Registrados")
+        # ---------- SUB-TAB 1: VER Y GESTIONAR DOCTORES ----------
+        with admin_tab1:
+            st.markdown("#### 📋 Todos los Usuarios del Sistema")
             
+            # Tabla resumen de todos los usuarios
+            usuarios_data = []
+            for user, info in db.data["users"].items():
+                # Contar pacientes de este doctor
+                if info["role"] == "doctor":
+                    num_pacientes = len(db.get_patients_by_doctor(user))
+                    num_cargas = len([u for u in db.data.get("uploads", []) if u.get("doctor_user") == user])
+                else:
+                    num_pacientes = "-"
+                    num_cargas = "-"
+                
+                usuarios_data.append({
+                    "Usuario": f"@{user}",
+                    "Nombre": info["name"],
+                    "Rol": "👑 Admin" if info["role"] == "admin" else "👨‍⚕️ Doctor",
+                    "Estado": "🟢 Activo" if info.get("active", True) else "🔴 Inactivo",
+                    "Contraseña": info["pwd"],
+                    "Pacientes": num_pacientes,
+                    "Cargas": num_cargas
+                })
+            
+            df_usuarios = pd.DataFrame(usuarios_data)
+            
+            # Mostrar tabla con contraseñas ocultas por defecto
+            st.markdown("##### 👁️ Vista General")
+            mostrar_pwd = st.checkbox("🔓 Mostrar contraseñas (solo admin)", value=False)
+            
+            if mostrar_pwd:
+                st.dataframe(df_usuarios, use_container_width=True, hide_index=True)
+            else:
+                df_oculto = df_usuarios.copy()
+                df_oculto["Contraseña"] = "••••••"
+                st.dataframe(df_oculto, use_container_width=True, hide_index=True)
+            
+            st.markdown("---")
+            st.markdown("#### ⚙️ Gestionar Doctor Individual")
+            
+            # Selector de doctor
             doctores = {u: i for u, i in db.data["users"].items() if i["role"] == "doctor"}
             
             if doctores:
-                for user, info in doctores.items():
-                    estado = "🟢 Activo" if info["active"] else "🔴 Inactivo"
-                    with st.expander(f"👨‍⚕️ {info['name']} (@{user}) - {estado}"):
-                        c1, c2 = st.columns(2)
-                        
-                        with c1:
-                            nueva_pass = st.text_input("Nueva contraseña", type="password", key=f"pwd_{user}")
-                            if st.button("🔑 Cambiar Contraseña", key=f"btn_pwd_{user}"):
-                                if nueva_pass:
-                                    db.update_password(user, nueva_pass)
-                                    st.success("Contraseña actualizada")
-                                else:
-                                    st.warning("Ingrese una contraseña")
-                        
-                        with c2:
-                            st.write("")  # Espaciado
-                            st.write("")
-                            if st.button("🔄 Activar/Desactivar", key=f"btn_toggle_{user}"):
-                                db.toggle_active(user)
+                opciones_doctores = [f"{info['name']} (@{user})" for user, info in doctores.items()]
+                doctor_seleccionado = st.selectbox("Seleccionar doctor a gestionar:", [""] + opciones_doctores)
+                
+                if doctor_seleccionado:
+                    # Extraer username del doctor seleccionado
+                    user_sel = doctor_seleccionado.split("(@")[1].replace(")", "")
+                    info_sel = doctores[user_sel]
+                    
+                    st.markdown(f"##### Gestionando: **{info_sel['name']}**")
+                    
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.markdown("**🔐 Cambiar Contraseña**")
+                        nueva_pwd = st.text_input("Nueva contraseña:", type="password", key="admin_new_pwd")
+                        if st.button("💾 Guardar Contraseña", key="btn_save_pwd", use_container_width=True):
+                            if nueva_pwd:
+                                db.update_password(user_sel, nueva_pwd)
+                                st.success("✅ Contraseña actualizada")
                                 st.rerun()
-                            
-                            if st.button("🗑️ Eliminar", key=f"btn_del_{user}", type="primary"):
-                                db.delete_doctor(user)
-                                st.success(f"Doctor {info['name']} eliminado")
+                            else:
+                                st.warning("Ingrese una contraseña")
+                    
+                    with col2:
+                        st.markdown("**🔄 Estado de Cuenta**")
+                        estado_actual = "🟢 ACTIVO" if info_sel.get("active", True) else "🔴 INACTIVO"
+                        st.info(f"Estado actual: {estado_actual}")
+                        
+                        if info_sel.get("active", True):
+                            if st.button("🚫 Desactivar Cuenta", key="btn_desactivar", use_container_width=True):
+                                db.toggle_active(user_sel)
+                                st.warning("Cuenta desactivada")
                                 st.rerun()
+                        else:
+                            if st.button("✅ Activar Cuenta", key="btn_activar", use_container_width=True):
+                                db.toggle_active(user_sel)
+                                st.success("Cuenta activada")
+                                st.rerun()
+                    
+                    with col3:
+                        st.markdown("**🗑️ Eliminar Doctor**")
+                        st.warning("⚠️ Esta acción es irreversible")
+                        confirmar = st.checkbox("Confirmo que deseo eliminar", key="confirm_del")
+                        if st.button("🗑️ Eliminar Permanentemente", key="btn_eliminar", type="primary", use_container_width=True, disabled=not confirmar):
+                            db.delete_doctor(user_sel)
+                            st.success(f"Doctor {info_sel['name']} eliminado")
+                            st.rerun()
+                    
+                    # Ver pacientes de este doctor
+                    st.markdown("---")
+                    st.markdown(f"##### 📁 Pacientes de {info_sel['name']}")
+                    pacientes_doctor = db.get_patients_by_doctor(user_sel)
+                    if pacientes_doctor:
+                        df_pac = pd.DataFrame(pacientes_doctor)
+                        st.dataframe(
+                            df_pac[["nombre_paciente", "timestamp", "riesgo", "nivel"]].head(20),
+                            use_container_width=True,
+                            hide_index=True
+                        )
+                        st.caption(f"Mostrando últimos 20 de {len(pacientes_doctor)} registros")
+                    else:
+                        st.info("Este doctor no tiene pacientes registrados")
             else:
-                st.info("No hay doctores registrados")
+                st.info("No hay doctores registrados en el sistema")
+        
+        # ---------- SUB-TAB 2: CREAR DOCTOR ----------
+        with admin_tab2:
+            st.markdown("#### ➕ Registrar Nuevo Doctor")
+            
+            with st.form("form_nuevo_doctor"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    nuevo_user = st.text_input("👤 Usuario (sin espacios)", placeholder="dr.apellido").lower().strip()
+                    nuevo_pwd = st.text_input("🔐 Contraseña", type="password")
+                with col2:
+                    nuevo_nombre = st.text_input("📝 Nombre completo", placeholder="Dr. Juan Pérez")
+                    nuevo_pwd_confirm = st.text_input("🔐 Confirmar contraseña", type="password")
+                
+                if st.form_submit_button("✅ Crear Doctor", use_container_width=True):
+                    if not nuevo_user or not nuevo_pwd or not nuevo_nombre:
+                        st.error("❌ Todos los campos son obligatorios")
+                    elif db.get_user(nuevo_user):
+                        st.error("❌ El usuario ya existe")
+                    elif " " in nuevo_user:
+                        st.error("❌ El usuario no puede tener espacios")
+                    elif nuevo_pwd != nuevo_pwd_confirm:
+                        st.error("❌ Las contraseñas no coinciden")
+                    elif len(nuevo_pwd) < 4:
+                        st.error("❌ La contraseña debe tener al menos 4 caracteres")
+                    else:
+                        db.create_doctor(nuevo_user, nuevo_pwd, nuevo_nombre)
+                        st.success(f"✅ Doctor **{nuevo_nombre}** creado exitosamente")
+                        st.balloons()
+                        st.rerun()
+        
+        # ---------- SUB-TAB 3: ACTIVIDAD Y ARCHIVOS ----------
+        with admin_tab3:
+            st.markdown("#### 📊 Ranking de Doctores más Activos")
+            
+            all_patients = db.get_all_patients()
+            
+            if all_patients:
+                df_all = pd.DataFrame(all_patients)
+                
+                # Ranking por número de evaluaciones
+                ranking = df_all.groupby(["doctor_user", "doctor_name"]).agg({
+                    "nombre_paciente": "count",
+                    "riesgo": "mean"
+                }).reset_index()
+                ranking.columns = ["Usuario", "Doctor", "Total Evaluaciones", "Riesgo Promedio"]
+                ranking["Riesgo Promedio"] = ranking["Riesgo Promedio"].round(1)
+                ranking = ranking.sort_values("Total Evaluaciones", ascending=False)
+                ranking["🏆 Ranking"] = range(1, len(ranking) + 1)
+                ranking = ranking[["🏆 Ranking", "Doctor", "Usuario", "Total Evaluaciones", "Riesgo Promedio"]]
+                
+                # Mostrar podio
+                col1, col2, col3 = st.columns(3)
+                if len(ranking) >= 1:
+                    col2.metric("🥇 1er Lugar", ranking.iloc[0]["Doctor"], f"{ranking.iloc[0]['Total Evaluaciones']} evaluaciones")
+                if len(ranking) >= 2:
+                    col1.metric("🥈 2do Lugar", ranking.iloc[1]["Doctor"], f"{ranking.iloc[1]['Total Evaluaciones']} evaluaciones")
+                if len(ranking) >= 3:
+                    col3.metric("🥉 3er Lugar", ranking.iloc[2]["Doctor"], f"{ranking.iloc[2]['Total Evaluaciones']} evaluaciones")
+                
+                st.markdown("##### 📋 Tabla Completa de Actividad")
+                st.dataframe(ranking, use_container_width=True, hide_index=True)
+                
+                # Gráfico de barras
+                fig_ranking = px.bar(
+                    ranking.head(10), 
+                    x="Doctor", 
+                    y="Total Evaluaciones",
+                    color="Total Evaluaciones",
+                    color_continuous_scale="Blues",
+                    title="Top 10 Doctores por Evaluaciones"
+                )
+                st.plotly_chart(fig_ranking, use_container_width=True)
+            else:
+                st.info("No hay actividad registrada aún")
+            
+            st.markdown("---")
+            st.markdown("#### 📤 Historial de Cargas Masivas")
+            
+            uploads = db.data.get("uploads", [])
+            if uploads:
+                df_uploads = pd.DataFrame(uploads)
+                st.dataframe(df_uploads, use_container_width=True, hide_index=True)
+            else:
+                st.info("No hay cargas masivas registradas")
+            
+            st.markdown("---")
+            st.markdown("#### 🔒 Acceso a Datos por Doctor")
+            st.info("👆 Selecciona un doctor en la pestaña 'Ver/Gestionar Doctores' para ver sus pacientes. Los datos de cada doctor están completamente aislados y nunca se cruzan entre médicos.")
 
     # =============================================
     # TAB 5: ESTADÍSTICAS ADMIN
