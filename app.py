@@ -40,11 +40,11 @@ st.markdown(f"""
     
     /* Estilos generales */
     .main {{
-        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
     }}
     
     h1, h2, h3, h4, h5 {{
-        color: {PRIMARY} !important;
+        color: #ffffff !important;
         font-weight: 600 !important;
     }}
     
@@ -68,12 +68,13 @@ st.markdown(f"""
     
     /* Cards de métricas */
     .metric-card {{
-        background: white;
+        background: #2d3748;
         padding: 25px;
         border-radius: 15px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         border-left: 5px solid {PRIMARY};
         transition: all 0.3s ease;
+        color: white;
     }}
     
     .metric-card:hover {{
@@ -113,10 +114,10 @@ st.markdown(f"""
     /* Tabs personalizados */
     .stTabs [data-baseweb="tab-list"] {{
         gap: 10px;
-        background: white;
+        background: #2d3748;
         padding: 10px;
         border-radius: 15px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
     }}
     
     .stTabs [data-baseweb="tab"] {{
@@ -124,6 +125,7 @@ st.markdown(f"""
         padding: 10px 20px;
         font-weight: 600;
         transition: all 0.3s ease;
+        color: #cbd5e0;
     }}
     
     .stTabs [aria-selected="true"] {{
@@ -134,48 +136,68 @@ st.markdown(f"""
     /* Inputs mejorados */
     .stTextInput input, .stNumberInput input, .stSelectbox select {{
         border-radius: 10px;
-        border: 2px solid #e0e0e0;
+        border: 2px solid #4a5568;
+        background: #2d3748;
+        color: white;
         transition: all 0.3s ease;
     }}
     
     .stTextInput input:focus, .stNumberInput input:focus {{
         border-color: {PRIMARY};
         box-shadow: 0 0 0 3px {PRIMARY}22;
+        background: #374151;
+    }}
+    
+    /* Labels de inputs */
+    .stTextInput label, .stNumberInput label, .stSelectbox label {{
+        color: #e2e8f0 !important;
     }}
     
     /* Notificaciones */
     .stSuccess, .stError, .stWarning, .stInfo {{
         border-radius: 10px;
         border-left: 5px solid;
+        background: #2d3748;
+        color: white;
     }}
     
     /* Footer */
     .footer {{
         text-align: center;
         padding: 20px;
-        color: #666;
+        color: #cbd5e0;
         font-size: 0.9em;
-        background: white;
+        background: #2d3748;
         border-radius: 15px;
         margin-top: 30px;
     }}
     
     /* Login especial */
     .login-container {{
-        background: white;
+        background: #2d3748;
         padding: 40px;
         border-radius: 20px;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    }}
+    
+    /* Contenedores generales */
+    .stMarkdown, .stDataFrame {{
+        color: #e2e8f0;
+    }}
+    
+    /* Sidebar oscuro */
+    [data-testid="stSidebar"] {{
+        background: #1a202c;
     }}
 </style>
 """, unsafe_allow_html=True)
 
 # Header principal
 st.markdown(f"""
-<div style='text-align:center; padding: 30px 0; background: white; border-radius: 20px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.08);'>
+<div style='text-align:center; padding: 30px 0; background: linear-gradient(135deg, #2d3748, #1a202c); border-radius: 20px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);'>
     <h1 style='color: {PRIMARY}; font-size: 3em; margin: 0;'>🏥 NefroPredict RD</h1>
-    <p style='color: #666; font-size: 1.2em; margin-top: 10px;'>Sistema Inteligente de Detección Temprana de ERC</p>
-    <p style='color: #999; font-size: 0.9em;'>República Dominicana • Versión 2.0</p>
+    <p style='color: #cbd5e0; font-size: 1.2em; margin-top: 10px;'>Sistema Inteligente de Detección Temprana de ERC</p>
+    <p style='color: #718096; font-size: 0.9em;'>República Dominicana • Versión 2.0</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -478,7 +500,7 @@ if not st.session_state.logged_in:
         <div class='login-container'>
             <div style='text-align:center; margin-bottom:30px;'>
                 <h2 style='color: #0066CC;'>🔐 Acceso Seguro</h2>
-                <p style='color:#666;'>Ingrese sus credenciales</p>
+                <p style='color:#cbd5e0;'>Ingrese sus credenciales</p>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -521,20 +543,20 @@ if not st.session_state.logged_in:
                 st.info("📧 Contacte al administrador para restablecer su contraseña")
         
         st.markdown("""
-        <div style='text-align:center; margin-top:30px; color:#999; font-size:0.85em;'>
+        <div style='text-align:center; margin-top:30px; color:#718096; font-size:0.85em;'>
             <p>🔒 Conexión segura con encriptación bcrypt</p>
-            <p>Primera vez: use <code>admin</code> / <code>Admin2024!</code></p>
+            <p>Primera vez: use <code style='background:#374151; padding:3px 8px; border-radius:5px;'>admin</code> / <code style='background:#374151; padding:3px 8px; border-radius:5px;'>Admin2024!</code></p>
         </div>
         """, unsafe_allow_html=True)
     st.stop()
 
 # Barra superior mejorada
 st.markdown(f"""
-<div style='background:white; padding:15px 25px; border-radius:15px; margin-bottom:25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); display:flex; justify-content:space-between; align-items:center;'>
+<div style='background: linear-gradient(135deg, #2d3748, #1a202c); padding:15px 25px; border-radius:15px; margin-bottom:25px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); display:flex; justify-content:space-between; align-items:center;'>
     <div>
-        <span style='font-size:1.1em;'>👨‍⚕️ <strong>{st.session_state.doctor_name}</strong></span>
-        <span style='color:#999; margin-left:15px;'>@{st.session_state.username}</span>
-        <span style='background:{PRIMARY}20; color:{PRIMARY}; padding:3px 10px; border-radius:20px; margin-left:15px; font-size:0.85em;'>{st.session_state.role.upper()}</span>
+        <span style='font-size:1.1em; color:white;'>👨‍⚕️ <strong>{st.session_state.doctor_name}</strong></span>
+        <span style='color:#cbd5e0; margin-left:15px;'>@{st.session_state.username}</span>
+        <span style='background:{PRIMARY}; color:white; padding:3px 10px; border-radius:20px; margin-left:15px; font-size:0.85em;'>{st.session_state.role.upper()}</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -579,6 +601,7 @@ with tab1:
     col_form, col_result = st.columns([1.2, 1])
     
     with col_form:
+        st.markdown("<div style='background:#2d3748; padding:25px; border-radius:15px;'>", unsafe_allow_html=True)
         st.markdown("### 📝 Datos del Paciente")
         with st.form("form_eval"):
             nombre = st.text_input("👤 Nombre completo", placeholder="Juan Pérez García")
@@ -594,6 +617,7 @@ with tab1:
                 creat = st.number_input("🧪 Creatinina sérica (mg/dL)", 0.1, 15.0, 1.2, 0.01)
             
             submitted = st.form_submit_button("🔬 Analizar Riesgo", use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
     
     with col_result:
         if submitted:
@@ -631,9 +655,9 @@ with tab1:
             # Tarjeta resultado
             st.markdown(f"""
             <div class='risk-card risk-{"high" if p["riesgo"]>70 else "med" if p["riesgo"]>40 else "low"}'>
-                <h2 style='color:{color}; margin:0;'>{nivel}</h2>
-                <h1 style='font-size:3.5em; color:{color}; margin:10px 0;'>{p["riesgo"]:.1f}%</h1>
-                <p style='color:#666; font-size:1.1em;'>{reco}</p>
+                <h2 style='color:{color}; margin:0; text-shadow: 0 2px 10px rgba(0,0,0,0.3);'>{nivel}</h2>
+                <h1 style='font-size:3.5em; color:{color}; margin:10px 0; text-shadow: 0 2px 10px rgba(0,0,0,0.3);'>{p["riesgo"]:.1f}%</h1>
+                <p style='color:#e2e8f0; font-size:1.1em; text-shadow: 0 1px 3px rgba(0,0,0,0.2);'>{reco}</p>
             </div>
             """, unsafe_allow_html=True)
 
