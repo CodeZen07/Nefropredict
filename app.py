@@ -298,6 +298,7 @@ class DataStore:
             if 'created_at' not in user:
                  user['created_at'] = datetime.now().isoformat()
 
+        # Guardar la estructura corregida
         with open(DB_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
         return data
@@ -375,7 +376,7 @@ class DataStore:
             self.data["users"][username]["pwd"] = hash_password(new_pwd)
             self.data["users"][username]["login_attempts"] = 0
             self.save()
-            self.log_audit(updated_by, f"Cambió contraseña de @{username}", "PASSWORD_CHANGED")
+            self.log_audit(updated_by, f"Cambió/Restableció contraseña de @{username}", "PASSWORD_RESET")
 
     def toggle_active(self, username, toggled_by="admin"):
         if username in self.data["users"]:
@@ -445,10 +446,11 @@ model = load_model()
 def predecir(row):
     # Estandarización de entradas para TFG
     sexo_tfg = "mujer" if row.get("sexo", "Hombre") == "Mujer" else "hombre"
-    raza_tfg = "afro" if row.get("raza", "No-Afroamericano") == "Afroamericano" else "no_afro"
+    raza_tfg = row.get("raza", "No-Afroamericano").lower()
+    raza_tfg_input = "afro" if "afro" in raza_tfg else "no_afro"
     
     # 1. CALCULAR TFG Y ESTADIO
-    tfg = calcular_tfg_ckdepi(row["creatinina"], row["edad"], sexo_tfg, raza_tfg)
+    tfg = calcular_tfg_ckdepi(row["creatinina"], row["edad"], sexo_tfg, raza_tfg_input)
     estadio = clasificar_erc(tfg)
 
     # 2. PREDICCIÓN DEL RIESGO
@@ -521,6 +523,7 @@ def clasificar_erc(tfg):
 class PDFReport(FPDF):
     def header(self):
         global PRIMARY
+        # Cambiado a colores RGB para mejor compatibilidad FPDF
         self.set_fill_color(0, 102, 204) # PRIMARY
         self.rect(0, 0, 210, 20, 'F')
         self.set_text_color(255, 255, 255)
@@ -950,9 +953,9 @@ with tab2:
                         
                         # Colores para la tabla
                         def color_clasificacion(val):
-                            if val == 'Grave': return f'background-color: {DANGER}44'
-                            if val == 'Intermedio': return f'background-color: {WARNING}44'
-                            return f'background-color: {SUCCESS}44'
+                            if val == 'Grave': return f'background-color: {hex_to_rgba(DANGER, 0.2)}'
+                            if val == 'Intermedio': return f'background-color: {hex_to_rgba(WARNING, 0.2)}'
+                            return f'background-color: {hex_to_rgba(SUCCESS, 0.2)}'
 
                         st.dataframe(
                             df_clasificado.style.applymap(color_clasificacion, subset=['clasificacion']),
@@ -1015,15 +1018,31 @@ with tab3:
             'doctor_name': 'Doctor'
         })
         
-        # Mostrar la tabla de datos y permitir selección
-        st.dataframe(df_display.drop(columns=['timestamp']), use_container_width=True, selection_mode='single')
+        # Guardar en session_state para poder seleccionar
+        st.data_editor(
+            df_display.drop(columns=['timestamp']), 
+            use_container_width=True, 
+            key='dataframe_historial_evaluaciones',
+            hide_index=True,
+            column_config={
+                "Riesgo (%)": st.column_config.ProgressColumn(
+                    "Riesgo (%)",
+                    help="Riesgo de ERC según el modelo",
+                    format="%d%%",
+                    min_value=0,
+                    max_value=100,
+                )
+            }
+        )
         
         # Manejar la selección
-        selected_rows = st.session_state.get('dataframe_historial_evaluaciones_selected_rows') # Se usa el nombre de Streamlit para el widget dataframe
+        selected_rows = st.session_state.get('dataframe_historial_evaluaciones_selected_rows')
         
         if selected_rows and selected_rows['selected_rows']:
-            selected_index = selected_rows['selected_rows'][0]
-            selected_record_timestamp = df_display.loc[selected_index, 'timestamp']
+            # Streamlit devuelve el índice visible (0, 1, 2, ...), que no siempre coincide con el índice de la DB,
+            # pero como no filtramos y usamos `df_display`, usamos el índice posicional.
+            selected_index_pos = selected_rows['selected_rows'][0]
+            selected_record_timestamp = df_display.iloc[selected_index_pos]['timestamp']
             
             # Buscar el registro completo en la lista original usando el timestamp único
             selected_record = next(
@@ -1035,9 +1054,8 @@ with tab3:
                 st.markdown("---")
                 st.markdown(f"### Detalle de Evaluación: {selected_record['nombre_paciente']}")
                 
-                # Almacenar en session_state para poder generar PDF individual
+                # Almacenar en session_state para poder generar PDF individual en Tab 1
                 st.session_state.ultimo = selected_record
-                st.rerun() # Disparar reruns para mostrar el detalle en tab 1 si se desea, o solo mostrar aquí
                 
                 # Mostrar detalle del resultado
                 s_riesgo = selected_record['riesgo']
@@ -1086,7 +1104,7 @@ with tab3:
 
 
 # =============================================
-# TAB 4: GESTIÓN DE USUARIOS (SOLO ADMIN - CORREGIDO)
+# TAB 4: GESTIÓN DE USUARIOS (SOLO ADMIN - CORREGIDO Y RESTABLECER CONTRASEÑA)
 # =============================================
 if st.session_state.role == "admin":
     with tab4:
@@ -1123,7 +1141,7 @@ if st.session_state.role == "admin":
                         
                         db.create_doctor(new_username, new_password, new_name, st.session_state.username)
                         st.success(f"✅ Doctor **{new_name} (@{new_username})** creado exitosamente.")
-                        st.experimental_rerun()
+                        st.rerun() # Recargar para actualizar la lista
 
         # --- TAB: LISTA Y ACCIONES ---
         with tab_list:
@@ -1148,36 +1166,73 @@ if st.session_state.role == "admin":
                 df_users = pd.DataFrame(doctor_data_list)
                 df_users['Fecha Creación'] = pd.to_datetime(df_users['Fecha Creación']).dt.strftime('%d/%m/%Y %H:%M')
                 
-                st.dataframe(df_users, use_container_width=True)
+                # Mostrar el DataFrame sin las columnas temporales que no aportan
+                st.dataframe(df_users, use_container_width=True, hide_index=True)
                 
                 st.markdown("---")
                 st.markdown("### Acciones de Usuario")
                 
-                # Usar solo doctores para acciones, excluyendo al admin
-                user_options = [k for k, v in users.items() if v.get("role") == "doctor"]
+                # Usar solo los nombres de usuario de los doctores para acciones
+                user_options = [d['Usuario'] for d in doctor_data_list]
                 
-                col_u1, col_u2, col_u3 = st.columns(3)
-                user_to_act = col_u1.selectbox("Seleccionar Usuario:", user_options, key="select_user_action")
-                
-                if user_to_act:
-                    current_user = db.get_user(user_to_act)
-                    current_status = current_user.get("active", True)
+                if user_options:
                     
-                    # Toggle Activo/Inactivo
-                    action_label = "Desactivar Cuenta" if current_status else "Activar Cuenta"
-                    if col_u2.button(f"🔒 {action_label}", key=f"toggle_{user_to_act}", use_container_width=True):
-                        db.toggle_active(user_to_act, st.session_state.username)
-                        st.success(f"Estado de @{user_to_act} cambiado a {'Inactivo' if current_status else 'Activo'}.")
-                        st.experimental_rerun()
+                    # --- Seccion 1: Activación/Desactivación y Eliminación ---
+                    st.markdown("#### 1. Gestión de Estado y Eliminación")
+                    
+                    col_u1, col_u2, col_u3 = st.columns(3)
+                    # Asegurar que el selectbox tiene un valor válido si la lista no está vacía
+                    user_to_act = col_u1.selectbox("Seleccionar Usuario para Estado/Eliminar:", user_options, key="select_user_action")
+                    
+                    if user_to_act:
+                        current_user = db.get_user(user_to_act)
+                        current_status = current_user.get("active", True)
                         
-                    # Eliminar
-                    if col_u3.button("🗑️ Eliminar Usuario", key=f"delete_{user_to_act}", use_container_width=True):
-                        db.delete_doctor(user_to_act, st.session_state.username)
-                        st.success(f"Usuario @{user_to_act} eliminado permanentemente.")
-                        st.experimental_rerun()
+                        # Toggle Activo/Inactivo
+                        action_label = "Desactivar Cuenta" if current_status else "Activar Cuenta"
+                        if col_u2.button(f"🔒 {action_label}", key=f"toggle_{user_to_act}", use_container_width=True):
+                            db.toggle_active(user_to_act, st.session_state.username)
+                            st.success(f"Estado de @{user_to_act} cambiado a {'Inactivo' if current_status else 'Activo'}.")
+                            st.rerun() # Recargar para mostrar el nuevo estado
+                            
+                        # Eliminar
+                        if col_u3.button("🗑️ Eliminar Usuario", key=f"delete_{user_to_act}", use_container_width=True):
+                            db.delete_doctor(user_to_act, st.session_state.username)
+                            st.success(f"Usuario @{user_to_act} eliminado permanentemente.")
+                            st.rerun() # Recargar para que el usuario eliminado desaparezca de la lista
+                    
+                    st.markdown("---")
+                    
+                    # --- Seccion 2: Restablecimiento de Contraseña (AÑADIDO) ---
+                    st.markdown("#### 2. Restablecimiento de Contraseña")
+                    st.warning("🚨 **IMPORTANTE:** No se pueden ver las contraseñas existentes. Esta acción asigna una **nueva** contraseña al usuario.")
+                    
+                    with st.form("form_reset_password"):
+                        col_r1, col_r2 = st.columns(2)
+                        user_to_reset = col_r1.selectbox("Seleccionar Usuario para Restablecer:", user_options, key="select_user_reset")
+                        new_pwd_reset = col_r2.text_input("Nueva Contraseña Temporal", type="password")
+                        
+                        submitted_reset = st.form_submit_button("🔑 Restablecer Contraseña", type="primary", use_container_width=True)
+                        
+                        if submitted_reset:
+                            if not new_pwd_reset:
+                                st.error("⚠️ Ingrese una nueva contraseña.")
+                            else:
+                                is_strong, msg = check_password_strength(new_pwd_reset)
+                                if not is_strong:
+                                    st.warning(f"Contraseña débil: {msg}")
+                                    # Permitir el reset, pero advertir
+                                
+                                db.update_password(user_to_reset, new_pwd_reset, st.session_state.username)
+                                st.success(f"✅ Contraseña de **@{user_to_reset}** restablecida exitosamente. El usuario debe usar la nueva contraseña para ingresar.")
+                                st.rerun() # Recargar
+                                
+                else:
+                    st.info("No hay doctores activos para realizar acciones.")
+
 
 # =============================================
-# TAB 5: ESTADÍSTICAS (SOLO ADMIN - IMPLEMENTADO)
+# TAB 5: ESTADÍSTICAS (SOLO ADMIN - CORREGIDO)
 # =============================================
 if st.session_state.role == "admin":
     with tab5:
@@ -1204,7 +1259,7 @@ if st.session_state.role == "admin":
                 fig_erc.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='white')
                 st.plotly_chart(fig_erc, use_container_width=True)
 
-            # --- GRÁFICO 2: Distribución de Nivel de Riesgo ---
+            # --- GRÁFICO 2: Distribución de Nivel de Riesgo (FIXED KEYERROR) ---
             with col_s2:
                 st.markdown("### Distribución de Nivel de Riesgo")
                 df_riesgo = df_stats['nivel'].value_counts().reset_index()
@@ -1213,7 +1268,10 @@ if st.session_state.role == "admin":
                 nivel_order = ["MODERADO", "ALTO", "MUY ALTO"]
                 color_map = {"MODERADO": SUCCESS, "ALTO": WARNING, "MUY ALTO": DANGER}
                 
-                fig_riesgo = px.bar(df_riesgo.set_index('Nivel').loc[nivel_order].reset_index(), x='Nivel', y='Total', 
+                # FIX: Usar reindex para asegurar que todos los niveles estén presentes (con 0 si no hay datos)
+                df_riesgo = df_riesgo.set_index('Nivel').reindex(nivel_order, fill_value=0).reset_index()
+                
+                fig_riesgo = px.bar(df_riesgo, x='Nivel', y='Total', 
                                     color='Nivel', title='Casos por Nivel de Riesgo',
                                     color_discrete_map=color_map)
                 fig_riesgo.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='white', xaxis_title="", yaxis_title="Número de Evaluaciones")
@@ -1275,6 +1333,7 @@ st.info("""
 - ✅ Encriptación de contraseñas (bcrypt)
 - ✅ Protección contra fuerza bruta (5 intentos)
 - ✅ Registro de auditoría completo
+- ✅ **Funcionalidad de Restablecimiento de Contraseña para Admin**
 - 🔜 Autenticación de 2 factores (2FA)
 - 🔜 Sesiones con expiración automática
 - 🔜 Recuperación de contraseña por email
