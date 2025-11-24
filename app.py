@@ -31,7 +31,7 @@ SUCCESS = "#06D6A0"      # Verde éxito
 BG_LIGHT = "#F8F9FA"
 TEXT_DARK = "#212529"
 
-# Función auxiliar para convertir HEX a RGBA (CORRECCIÓN CLAVE)
+# Función auxiliar para convertir HEX a RGBA (CORRECCIÓN PLOTLY)
 def hex_to_rgba(hex_color, alpha):
     """Convierte un color hexadecimal de 6 dígitos a una cadena RGBA."""
     hex_color = hex_color.lstrip('#')
@@ -39,7 +39,6 @@ def hex_to_rgba(hex_color, alpha):
         r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
         return f'rgba({r}, {g}, {b}, {alpha})'
     except ValueError:
-        # Fallback si el color es inválido, para evitar el error
         return 'rgba(128, 128, 128, 0.2)'
 
 
@@ -466,19 +465,12 @@ def riesgo_level(risk):
 def calcular_tfg_ckdepi(creatinina, edad, sexo="hombre", raza="no_afro"):
     """
     Calcula la Tasa de Filtración Glomerular (TFG) usando la fórmula CKD-EPI (2009).
-    Nota: Se asume creatinina en mg/dL.
     """
-    # Constantes
     k = 0.7 if sexo == "mujer" else 0.9
     alpha = -0.329 if sexo == "mujer" else -0.411
-    
-    # Coeficiente para raza afroamericana (se considera 1.159 si la raza es 'afro')
     raza_factor = 1.159 if raza == "afro" else 1.0
-
-    # Coeficiente para mujeres (se considera 1.018 si es 'mujer')
     sexo_factor = 1.018 if sexo == "mujer" else 1.0
     
-    # Cálculo CKD-EPI (2009)
     min_k_cr = min(creatinina / k, 1)
     max_k_cr = max(creatinina / k, 1)
     
@@ -754,7 +746,7 @@ with tab1:
             
             st.markdown("### 📊 Resultado")
             
-            # Gauge
+            # Gauge (CORREGIDO)
             st.plotly_chart(crear_gauge_riesgo(p["riesgo"]), use_container_width=True)
             
             # Tarjeta resultado
@@ -766,7 +758,7 @@ with tab1:
             </div>
             """, unsafe_allow_html=True)
             
-            # NUEVA SECCIÓN: Resultados Clínicos y Botón PDF
+            # Resultados Clínicos y Botón PDF
             st.markdown("---")
             st.markdown("### 🔬 Parámetros Renales Clave")
             
@@ -790,13 +782,11 @@ with tab1:
             # Generación del PDF (Botón de Descarga)
             if st.button("⬇️ Descargar Reporte PDF", use_container_width=True):
                 
-                # Se crea la instancia del PDF
                 pdf = PDFReport()
                 pdf.set_auto_page_break(auto=True, margin=15)
                 pdf.add_page()
                 pdf.set_font('Arial', '', 12)
                 
-                # Datos Generales
                 pdf.chapter_title("1. Datos de la Evaluación", PRIMARY)
                 pdf.chapter_body(
                     f"Paciente: {p['nombre_paciente']}\n"
@@ -804,7 +794,6 @@ with tab1:
                     f"Evaluado por: {p['doctor_name']} (@{p['doctor_user']})"
                 )
                 
-                # Datos Clínicos de Entrada
                 pdf.chapter_title("2. Parámetros de Entrada", PRIMARY)
                 pdf.chapter_body(
                     f"Edad: {p['edad']} años\n"
@@ -816,7 +805,6 @@ with tab1:
                     f"Creatinina Sérica: {p['creatinina']} mg/dL"
                 )
                 
-                # Resultados Clave
                 pdf.chapter_title("3. Resultados de la Predicción", color)
                 pdf.chapter_body(
                     f"RIESGO DE ERC (Predicción): {p['riesgo']:.1f}% ({nivel})\n"
@@ -825,7 +813,6 @@ with tab1:
                     f"RECOMENDACIÓN: {reco}"
                 )
                 
-                # Envío del PDF a Streamlit para descarga
                 pdf_output = pdf.output(dest='S').encode('latin1')
                 st.download_button(
                     label="¡Reporte generado! Haz clic para descargar.",
@@ -833,6 +820,168 @@ with tab1:
                     file_name=f"Reporte_ERC_{p['nombre_paciente'].replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf",
                     mime="application/pdf"
                 )
+
+# =============================================
+# TAB 2: CARGA MASIVA (AÚN NO IMPLEMENTADA)
+# =============================================
+with tab2:
+    st.markdown("## 📤 Carga Masiva de Datos")
+    st.info("Esta sección está en desarrollo. Aquí podrás subir archivos Excel o CSV con múltiples registros de pacientes para una evaluación masiva.")
+    # Implementación pendiente: subir archivo, procesar filas, guardar resultados.
+
+# =============================================
+# TAB 3: HISTORIAL (IMPLEMENTADO)
+# =============================================
+with tab3:
+    st.markdown("## 📊 Historial de Evaluaciones")
+    st.info("Aquí puede revisar todas las evaluaciones registradas en el sistema.")
+    
+    # Lógica para mostrar los datos
+    if st.session_state.role == "admin":
+        data = db.get_all_patients()
+        st.markdown("### Historial Completo del Sistema")
+    else:
+        data = db.get_patients_by_doctor(st.session_state.username)
+        st.markdown(f"### Historial de Evaluaciones Realizadas por @{st.session_state.username}")
+
+    if data:
+        df = pd.DataFrame(data)
+        
+        # Formatear la columna de tiempo
+        df['Fecha'] = pd.to_datetime(df['timestamp']).dt.strftime('%d/%m/%Y %H:%M')
+        
+        # Seleccionar y renombrar las columnas relevantes
+        df_display = df[[
+            'Fecha', 'nombre_paciente', 'edad', 'sexo', 'creatinina', 'tfg', 
+            'estadio_erc', 'riesgo', 'nivel', 'doctor_name'
+        ]].rename(columns={
+            'nombre_paciente': 'Paciente',
+            'edad': 'Edad',
+            'sexo': 'Sexo',
+            'creatinina': 'Creatinina (mg/dL)',
+            'tfg': 'TFG (CKD-EPI)',
+            'estadio_erc': 'Estadio ERC',
+            'riesgo': 'Riesgo (%)',
+            'nivel': 'Nivel Riesgo',
+            'doctor_name': 'Doctor'
+        })
+        
+        # Mostrar la tabla de datos
+        st.dataframe(df_display, use_container_width=True)
+        
+        # Opción de descarga
+        @st.cache_data
+        def convert_df(df):
+            return df.to_csv(index=False).encode('utf-8')
+
+        csv = convert_df(df_display)
+
+        st.download_button(
+            label="Descargar Historial en CSV",
+            data=csv,
+            file_name=f'historial_nefropredict_{st.session_state.username}_{datetime.now().strftime("%Y%m%d")}.csv',
+            mime='text/csv',
+        )
+
+    else:
+        st.warning("No se encontraron evaluaciones registradas.")
+
+
+# =============================================
+# TAB 4: GESTIÓN DE USUARIOS (SOLO ADMIN - IMPLEMENTADO)
+# =============================================
+if st.session_state.role == "admin":
+    with tab4:
+        st.markdown("## 👥 Gestión de Usuarios Médicos")
+        
+        tab_add, tab_list = st.tabs(["➕ Crear Nuevo Doctor", "📋 Lista y Acciones"])
+        
+        # --- TAB: CREAR NUEVO DOCTOR ---
+        with tab_add:
+            st.markdown("### 👨‍⚕️ Registro de Nuevo Usuario Doctor")
+            with st.form("form_new_doctor"):
+                new_name = st.text_input("Nombre Completo del Doctor", placeholder="Dr. Luis Rodríguez")
+                new_username = st.text_input("Nombre de Usuario (ID)", placeholder="luis.rodriguez").lower().strip()
+                
+                c_pwd1, c_pwd2 = st.columns(2)
+                with c_pwd1:
+                    new_password = st.text_input("Contraseña", type="password")
+                with c_pwd2:
+                    confirm_password = st.text_input("Confirmar Contraseña", type="password")
+                
+                submitted_new = st.form_submit_button("Crear Doctor", use_container_width=True)
+                
+                if submitted_new:
+                    if not new_name or not new_username or not new_password:
+                        st.error("⚠️ Todos los campos son obligatorios.")
+                    elif db.get_user(new_username):
+                        st.error(f"❌ El usuario @{new_username} ya existe.")
+                    elif new_password != confirm_password:
+                        st.error("❌ Las contraseñas no coinciden.")
+                    else:
+                        is_strong, msg = check_password_strength(new_password)
+                        if not is_strong:
+                            st.warning(f"Contraseña débil: {msg}")
+                        
+                        db.create_doctor(new_username, new_password, new_name, st.session_state.username)
+                        st.success(f"✅ Doctor **{new_name} (@{new_username})** creado exitosamente.")
+                        st.experimental_rerun()
+
+        # --- TAB: LISTA Y ACCIONES ---
+        with tab_list:
+            st.markdown("### 📋 Doctores Registrados")
+            users = db.data["users"]
+            doctor_list = {k: v for k, v in users.items() if v["role"] == "doctor"}
+            
+            if not doctor_list:
+                st.info("No hay doctores registrados en el sistema.")
+            else:
+                df_users = pd.DataFrame(doctor_list).T
+                df_users['Estado'] = df_users['active'].apply(lambda x: 'Activo' if x else 'Inactivo')
+                df_users = df_users.drop(columns=['pwd', 'role', 'login_attempts'])
+                df_users = df_users.rename(columns={'name': 'Nombre', 'created_at': 'Fecha Creación', 'last_login': 'Último Ingreso'})
+                df_users['Fecha Creación'] = pd.to_datetime(df_users['Fecha Creación']).dt.strftime('%d/%m/%Y %H:%M')
+                
+                st.dataframe(df_users, use_container_width=True)
+                
+                st.markdown("---")
+                st.markdown("### Acciones de Usuario")
+                
+                col_u1, col_u2, col_u3 = st.columns(3)
+                user_to_act = col_u1.selectbox("Seleccionar Usuario:", list(doctor_list.keys()))
+                
+                if user_to_act:
+                    current_user = db.get_user(user_to_act)
+                    current_status = current_user.get("active", True)
+                    
+                    # Toggle Activo/Inactivo
+                    action_label = "Desactivar Cuenta" if current_status else "Activar Cuenta"
+                    if col_u2.button(f"🔒 {action_label}", key=f"toggle_{user_to_act}", use_container_width=True):
+                        db.toggle_active(user_to_act, st.session_state.username)
+                        st.success(f"Estado de @{user_to_act} cambiado a {'Inactivo' if current_status else 'Activo'}.")
+                        st.experimental_rerun()
+                        
+                    # Eliminar
+                    if col_u3.button("🗑️ Eliminar Usuario", key=f"delete_{user_to_act}", use_container_width=True):
+                        db.delete_doctor(user_to_act, st.session_state.username)
+                        st.success(f"Usuario @{user_to_act} eliminado permanentemente.")
+                        st.experimental_rerun()
+
+# =============================================
+# TABS PENDIENTES (Estadísticas y Auditoría)
+# =============================================
+if st.session_state.role == "admin":
+    with tab5:
+        st.markdown("## 📈 Estadísticas y Dashboard")
+        st.info("Esta sección está pendiente de implementar.")
+    
+    with tab6:
+        st.markdown("## 🔍 Registro de Auditoría")
+        logs = db.get_audit_log(limit=50)
+        df_logs = pd.DataFrame(logs)
+        df_logs['timestamp'] = pd.to_datetime(df_logs['timestamp']).dt.strftime('%d/%m/%Y %H:%M:%S')
+        st.dataframe(df_logs, use_container_width=True)
+
 
 # =============================================
 # CARACTERÍSTICAS SUGERIDAS (FIN DEL CÓDIGO)
