@@ -10,6 +10,7 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 from io import BytesIO
+from fpdf import FPDF # NUEVA IMPORTACIÓN PARA PDF
 
 # =============================================
 # CONFIGURACIÓN Y ESTILOS MEJORADOS
@@ -425,7 +426,7 @@ model = load_model()
 
 def predecir(row):
     feats = np.array([[row["edad"], row["imc"], row["presion_sistolica"],
-                       row["glucosa_ayunas"], row["creatinina"]]])
+                        row["glucosa_ayunas"], row["creatinina"]]])
     if model:
         return round(model.predict_proba(feats)[0][1] * 100, 1)
     else:
@@ -445,6 +446,81 @@ def riesgo_level(risk):
         return "ALTO", WARNING, "Intervención Media - Control estricto y seguimiento mensual"
     else:
         return "MODERADO", SUCCESS, "Seguimiento Rutinario - Control cada 6 meses"
+
+# =============================================
+# FUNCIONES CLÍNICAS AVANZADAS (AÑADIDAS)
+# =============================================
+
+def calcular_tfg_ckdepi(creatinina, edad, sexo="hombre", raza="no_afro"):
+    """
+    Calcula la Tasa de Filtración Glomerular (TFG) usando la fórmula CKD-EPI (2009).
+    Nota: Se asume creatinina en mg/dL.
+    """
+    # Constantes
+    k = 0.7 if sexo == "mujer" else 0.9
+    alpha = -0.329 if sexo == "mujer" else -0.411
+    
+    # Coeficiente para raza afroamericana (se considera 1.159 si la raza es 'afro')
+    raza_factor = 1.159 if raza == "afro" else 1.0
+
+    # Coeficiente para mujeres (se considera 1.018 si es 'mujer')
+    sexo_factor = 1.018 if sexo == "mujer" else 1.0
+    
+    # Cálculo CKD-EPI (2009)
+    min_k_cr = min(creatinina / k, 1)
+    max_k_cr = max(creatinina / k, 1)
+    
+    TFG = 141 * (min_k_cr ** alpha) * (max_k_cr ** -1.209) * (0.993 ** edad) * sexo_factor * raza_factor
+    
+    return round(TFG)
+
+def clasificar_erc(tfg):
+    """Clasifica el estadio de la Enfermedad Renal Crónica (ERC) basado en la TFG."""
+    if tfg >= 90:
+        return "G1 (Normal o Alto)"
+    elif tfg >= 60:
+        return "G2 (Levemente Disminuido)"
+    elif tfg >= 45:
+        return "G3a (Disminución Leve a Moderada)"
+    elif tfg >= 30:
+        return "G3b (Disminución Moderada a Severa)"
+    elif tfg >= 15:
+        return "G4 (Disminución Severa)"
+    else:
+        return "G5 (Fallo Renal)"
+
+# Clase para la Generación de PDF (AÑADIDA)
+class PDFReport(FPDF):
+    def header(self):
+        global PRIMARY
+        self.set_fill_color(0, 102, 204) # PRIMARY
+        self.rect(0, 0, 210, 20, 'F')
+        self.set_text_color(255, 255, 255)
+        self.set_font('Arial', 'B', 15)
+        self.cell(0, 10, 'NefroPredict RD - Reporte de Evaluación', 0, 1, 'C')
+        self.set_line_width(1.0)
+        self.line(10, 18, 200, 18)
+        self.ln(10)
+
+    def chapter_title(self, title, color_hex):
+        r, g, b = tuple(int(color_hex.strip('#')[i:i+2], 16) for i in (0, 2, 4))
+        self.set_text_color(r, g, b)
+        self.set_font('Arial', 'B', 14)
+        self.cell(0, 10, title, 0, 1, 'L')
+        self.ln(2)
+
+    def chapter_body(self, body):
+        self.set_text_color(33, 37, 41) # TEXT_DARK
+        self.set_font('Arial', '', 12)
+        self.multi_cell(0, 7, body)
+        self.ln()
+        
+    def footer(self):
+        self.set_y(-15)
+        self.set_font('Arial', 'I', 8)
+        self.set_text_color(150, 150, 150)
+        self.cell(0, 10, f'Página {self.page_no()}/{{nb}} | Evaluación generada por NefroPredict RD', 0, 0, 'C')
+
 
 def crear_gauge_riesgo(riesgo):
     """Gráfico de velocímetro mejorado"""
@@ -606,7 +682,13 @@ with tab1:
         with st.form("form_eval"):
             nombre = st.text_input("👤 Nombre completo", placeholder="Juan Pérez García")
             
-            st.markdown("#### Datos Clínicos")
+            st.markdown("#### Datos Demográficos y Clínicos")
+            c0_1, c0_2 = st.columns(2)
+            with c0_1:
+                sexo_input = st.selectbox("🚻 Sexo biológico", ["Hombre", "Mujer"]) # NUEVO INPUT
+            with c0_2:
+                raza_input = st.selectbox("🌍 Raza (para CKD-EPI)", ["No-Afroamericano", "Afroamericano"]) # NUEVO INPUT
+            
             c1, c2 = st.columns(2)
             with c1:
                 edad = st.number_input("📅 Edad (años)", 18, 120, 55)
@@ -624,19 +706,29 @@ with tab1:
             if not nombre.strip():
                 st.error("⚠️ El nombre del paciente es obligatorio")
             else:
-                # Calcular
+                # Estandarización de entradas para TFG
+                sexo_tfg = "mujer" if sexo_input == "Mujer" else "hombre"
+                raza_tfg = "afro" if raza_input == "Afroamericano" else "no_afro"
+                
+                # CALCULAR TFG Y ESTADIO (NUEVO)
+                tfg = calcular_tfg_ckdepi(creat, edad, sexo_tfg, raza_tfg)
+                estadio = clasificar_erc(tfg)
+                
+                # Predicción del riesgo ERC
                 datos = {"edad": edad, "imc": imc, "presion_sistolica": presion,
-                        "glucosa_ayunas": glucosa, "creatinina": creat}
+                            "glucosa_ayunas": glucosa, "creatinina": creat}
                 riesgo = predecir(datos)
                 nivel, color, reco = riesgo_level(riesgo)
                 
-                # Guardar
+                # Guardar (SE AÑADEN TFG Y ESTADIO)
                 record = {
                     "nombre_paciente": nombre,
                     "doctor_user": st.session_state.username,
                     "doctor_name": st.session_state.doctor_name,
                     "timestamp": datetime.now().isoformat(),
-                    **datos, "riesgo": riesgo, "nivel": nivel
+                    **datos, "riesgo": riesgo, "nivel": nivel, 
+                    "tfg": tfg, "estadio_erc": estadio,
+                    "sexo": sexo_input, "raza": raza_input
                 }
                 db.add_patient(record)
                 db.log_audit(st.session_state.username, f"Evaluó: {nombre} - {riesgo}%", "EVALUATION")
@@ -660,9 +752,76 @@ with tab1:
                 <p style='color:#e2e8f0; font-size:1.1em; text-shadow: 0 1px 3px rgba(0,0,0,0.2);'>{reco}</p>
             </div>
             """, unsafe_allow_html=True)
+            
+            # NUEVA SECCIÓN: Resultados Clínicos y Botón PDF
+            st.markdown("---")
+            st.markdown("### 🔬 Parámetros Renales Clave")
+            
+            col_tfg1, col_tfg2 = st.columns(2)
+            with col_tfg1:
+                st.markdown(f"""
+                <div class='metric-card' style='border-left: 5px solid {SECONDARY};'>
+                    <p style='margin:0; font-size:0.9em; color:#a0aec0;'>Tasa de Filtración Glomerular (TFG)</p>
+                    <h3 style='margin:5px 0 0 0; color:{SECONDARY};'>{p['tfg']} ml/min/1.73m²</h3>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col_tfg2:
+                st.markdown(f"""
+                <div class='metric-card' style='border-left: 5px solid {SECONDARY};'>
+                    <p style='margin:0; font-size:0.9em; color:#a0aec0;'>Estadio de ERC</p>
+                    <h3 style='margin:5px 0 0 0; color:{SECONDARY};'>{p['estadio_erc']}</h3>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Generación del PDF (Botón de Descarga)
+            if st.button("⬇️ Descargar Reporte PDF", use_container_width=True):
+                
+                # Se crea la instancia del PDF
+                pdf = PDFReport()
+                pdf.set_auto_page_break(auto=True, margin=15)
+                pdf.add_page()
+                
+                # Datos Generales
+                pdf.chapter_title("1. Datos de la Evaluación", PRIMARY)
+                pdf.chapter_body(
+                    f"Paciente: {p['nombre_paciente']}\n"
+                    f"Fecha: {datetime.fromisoformat(p['timestamp']).strftime('%d/%m/%Y %H:%M')}\n"
+                    f"Evaluado por: {p['doctor_name']} (@{p['doctor_user']})"
+                )
+                
+                # Datos Clínicos de Entrada
+                pdf.chapter_title("2. Parámetros de Entrada", PRIMARY)
+                pdf.chapter_body(
+                    f"Edad: {p['edad']} años\n"
+                    f"Sexo: {p['sexo']}\n"
+                    f"Raza: {p['raza']}\n"
+                    f"IMC: {p['imc']} kg/m²\n"
+                    f"Presión Sistólica: {p['presion_sistolica']} mmHg\n"
+                    f"Glucosa en Ayunas: {p['glucosa_ayunas']} mg/dL\n"
+                    f"Creatinina Sérica: {p['creatinina']} mg/dL"
+                )
+                
+                # Resultados Clave
+                pdf.chapter_title("3. Resultados de la Predicción", color)
+                pdf.chapter_body(
+                    f"RIESGO DE ERC (Predicción): {p['riesgo']:.1f}% ({nivel})\n"
+                    f"TFG Estimada (CKD-EPI): {p['tfg']} ml/min/1.73m²\n"
+                    f"ESTADIO ERC: {p['estadio_erc']}\n\n"
+                    f"RECOMENDACIÓN: {reco}"
+                )
+                
+                # Envío del PDF a Streamlit para descarga
+                pdf_output = pdf.output(dest='S').encode('latin1')
+                st.download_button(
+                    label="¡Reporte generado! Haz clic para descargar.",
+                    data=pdf_output,
+                    file_name=f"Reporte_ERC_{p['nombre_paciente'].replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf",
+                    mime="application/pdf"
+                )
 
 # =============================================
-# CARACTERÍSTICAS SUGERIDAS
+# CARACTERÍSTICAS SUGERIDAS (FIN DEL CÓDIGO)
 # =============================================
 st.markdown("---")
 st.info("""
@@ -683,10 +842,10 @@ st.info("""
 - API para integración con otros sistemas
 
 **📊 Funciones Médicas Avanzadas:**
-- Cálculo automático de TFG (Tasa de Filtración Glomerular)
-- Clasificación por estadios ERC (G1-G5)
+- ✅ **Cálculo automático de TFG (Tasa de Filtración Glomerular)**
+- ✅ **Clasificación por estadios ERC (G1-G5)**
+- ✅ **Reportes PDF profesionales**
 - Alertas automáticas para pacientes críticos
-- Reportes PDF profesionales
 - Comparación temporal del mismo paciente
 - Recomendaciones de tratamiento
 
@@ -696,5 +855,4 @@ st.info("""
 - Exportación masiva de reportes
 - Integración con sistemas hospitalarios (HL7/FHIR)
 
-¿Cuáles te gustaría implementar primero?
 """)
