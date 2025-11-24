@@ -10,7 +10,7 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 from io import BytesIO
-from fpdf import FPDF # NUEVA IMPORTACIÓN PARA PDF
+from fpdf import FPDF 
 
 # =============================================
 # CONFIGURACIÓN Y ESTILOS MEJORADOS
@@ -30,6 +30,18 @@ WARNING = "#F77F00"      # Naranja cálido
 SUCCESS = "#06D6A0"      # Verde éxito
 BG_LIGHT = "#F8F9FA"
 TEXT_DARK = "#212529"
+
+# Función auxiliar para convertir HEX a RGBA (CORRECCIÓN CLAVE)
+def hex_to_rgba(hex_color, alpha):
+    """Convierte un color hexadecimal de 6 dígitos a una cadena RGBA."""
+    hex_color = hex_color.lstrip('#')
+    try:
+        r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+        return f'rgba({r}, {g}, {b}, {alpha})'
+    except ValueError:
+        # Fallback si el color es inválido, para evitar el error
+        return 'rgba(128, 128, 128, 0.2)'
+
 
 st.markdown(f"""
 <style>
@@ -448,7 +460,7 @@ def riesgo_level(risk):
         return "MODERADO", SUCCESS, "Seguimiento Rutinario - Control cada 6 meses"
 
 # =============================================
-# FUNCIONES CLÍNICAS AVANZADAS (AÑADIDAS)
+# FUNCIONES CLÍNICAS AVANZADAS
 # =============================================
 
 def calcular_tfg_ckdepi(creatinina, edad, sexo="hombre", raza="no_afro"):
@@ -489,7 +501,7 @@ def clasificar_erc(tfg):
     else:
         return "G5 (Fallo Renal)"
 
-# Clase para la Generación de PDF (AÑADIDA)
+# Clase para la Generación de PDF
 class PDFReport(FPDF):
     def header(self):
         global PRIMARY
@@ -523,7 +535,7 @@ class PDFReport(FPDF):
 
 
 def crear_gauge_riesgo(riesgo):
-    """Gráfico de velocímetro mejorado"""
+    """Gráfico de velocímetro mejorado con corrección RGBA."""
     if riesgo > 70:
         color = DANGER
     elif riesgo > 40:
@@ -544,9 +556,10 @@ def crear_gauge_riesgo(riesgo):
             'borderwidth': 3,
             'bordercolor': PRIMARY,
             'steps': [
-                {'range': [0, 40], 'color': f'{SUCCESS}20'},
-                {'range': [40, 70], 'color': f'{WARNING}20'},
-                {'range': [70, 100], 'color': f'{DANGER}20'}
+                # CORRECCIÓN: Usar la función hex_to_rgba para la transparencia
+                {'range': [0, 40], 'color': hex_to_rgba(SUCCESS, 0.2)},
+                {'range': [40, 70], 'color': hex_to_rgba(WARNING, 0.2)},
+                {'range': [70, 100], 'color': hex_to_rgba(DANGER, 0.2)}
             ],
             'threshold': {
                 'line': {'color': "red", 'width': 4},
@@ -685,9 +698,9 @@ with tab1:
             st.markdown("#### Datos Demográficos y Clínicos")
             c0_1, c0_2 = st.columns(2)
             with c0_1:
-                sexo_input = st.selectbox("🚻 Sexo biológico", ["Hombre", "Mujer"]) # NUEVO INPUT
+                sexo_input = st.selectbox("🚻 Sexo biológico", ["Hombre", "Mujer"]) 
             with c0_2:
-                raza_input = st.selectbox("🌍 Raza (para CKD-EPI)", ["No-Afroamericano", "Afroamericano"]) # NUEVO INPUT
+                raza_input = st.selectbox("🌍 Raza (para CKD-EPI)", ["No-Afroamericano", "Afroamericano"]) 
             
             c1, c2 = st.columns(2)
             with c1:
@@ -710,7 +723,7 @@ with tab1:
                 sexo_tfg = "mujer" if sexo_input == "Mujer" else "hombre"
                 raza_tfg = "afro" if raza_input == "Afroamericano" else "no_afro"
                 
-                # CALCULAR TFG Y ESTADIO (NUEVO)
+                # CALCULAR TFG Y ESTADIO
                 tfg = calcular_tfg_ckdepi(creat, edad, sexo_tfg, raza_tfg)
                 estadio = clasificar_erc(tfg)
                 
@@ -720,7 +733,7 @@ with tab1:
                 riesgo = predecir(datos)
                 nivel, color, reco = riesgo_level(riesgo)
                 
-                # Guardar (SE AÑADEN TFG Y ESTADIO)
+                # Guardar (Se incluyen TFG, Estadio, Sexo y Raza)
                 record = {
                     "nombre_paciente": nombre,
                     "doctor_user": st.session_state.username,
@@ -781,6 +794,7 @@ with tab1:
                 pdf = PDFReport()
                 pdf.set_auto_page_break(auto=True, margin=15)
                 pdf.add_page()
+                pdf.set_font('Arial', '', 12)
                 
                 # Datos Generales
                 pdf.chapter_title("1. Datos de la Evaluación", PRIMARY)
