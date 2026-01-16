@@ -23,14 +23,15 @@ st.set_page_config(
 )
 
 # Paleta de colores médica profesional
-PRIMARY = "#0066CC"
-SECONDARY = "#00A896"
-DANGER = "#E63946"
-WARNING = "#F77F00"
-SUCCESS = "#06D6A0"
+PRIMARY = "#0066CC"      # Azul médico profesional
+SECONDARY = "#00A896"    # Verde azulado (salud)
+DANGER = "#E63946"       # Rojo médico
+WARNING = "#F77F00"      # Naranja cálido
+SUCCESS = "#06D6A0"      # Verde éxito
 BG_LIGHT = "#F8F9FA"
 TEXT_DARK = "#212529"
 
+# Función auxiliar para convertir HEX a RGBA
 def hex_to_rgba(hex_color, alpha):
     """Convierte un color hexadecimal de 6 dígitos a una cadena RGBA."""
     hex_color = hex_color.lstrip('#')
@@ -40,6 +41,7 @@ def hex_to_rgba(hex_color, alpha):
     except ValueError:
         return 'rgba(128, 128, 128, 0.2)'
 
+
 st.markdown(f"""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -48,6 +50,7 @@ st.markdown(f"""
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }}
     
+    /* Estilos generales */
     .main {{
         background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
     }}
@@ -57,6 +60,7 @@ st.markdown(f"""
         font-weight: 600 !important;
     }}
     
+    /* Botones mejorados */
     .stButton>button {{
         background: linear-gradient(135deg, {PRIMARY}, {SECONDARY});
         color: white;
@@ -74,6 +78,7 @@ st.markdown(f"""
         box-shadow: 0 6px 20px rgba(0,102,204,0.3);
     }}
     
+    /* Cards de métricas */
     .metric-card {{
         background: #2d3748;
         padding: 25px;
@@ -89,6 +94,7 @@ st.markdown(f"""
         box-shadow: 0 8px 25px rgba(0,0,0,0.12);
     }}
     
+    /* Tarjetas de riesgo */
     .risk-card {{
         padding: 30px;
         border-radius: 20px;
@@ -117,29 +123,7 @@ st.markdown(f"""
         border: 3px solid {SUCCESS};
     }}
     
-    .action-plan-card {{
-        background: #2d3748;
-        padding: 20px;
-        border-radius: 15px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        margin: 10px 0;
-        border-left: 5px solid {SECONDARY};
-    }}
-    
-    .alert-critical {{
-        background: linear-gradient(135deg, {DANGER}33, {DANGER}22);
-        border: 3px solid {DANGER};
-        padding: 25px;
-        border-radius: 15px;
-        animation: pulse 2s infinite;
-        box-shadow: 0 0 30px {DANGER}44;
-    }}
-    
-    @keyframes pulse {{
-        0%, 100% {{ transform: scale(1); }}
-        50% {{ transform: scale(1.02); }}
-    }}
-    
+    /* Tabs personalizados */
     .stTabs [data-baseweb="tab-list"] {{
         gap: 10px;
         background: #2d3748;
@@ -161,6 +145,7 @@ st.markdown(f"""
         color: white !important;
     }}
     
+    /* Inputs mejorados */
     .stTextInput input, .stNumberInput input, .stSelectbox select {{
         border-radius: 10px;
         border: 2px solid #4a5568;
@@ -175,10 +160,12 @@ st.markdown(f"""
         background: #374151;
     }}
     
+    /* Labels de inputs */
     .stTextInput label, .stNumberInput label, .stSelectbox label {{
         color: #e2e8f0 !important;
     }}
     
+    /* Notificaciones */
     .stSuccess, .stError, .stWarning, .stInfo {{
         border-radius: 10px;
         border-left: 5px solid;
@@ -186,6 +173,7 @@ st.markdown(f"""
         color: white;
     }}
     
+    /* Footer */
     .footer {{
         text-align: center;
         padding: 20px;
@@ -196,6 +184,7 @@ st.markdown(f"""
         margin-top: 30px;
     }}
     
+    /* Login especial */
     .login-container {{
         background: #2d3748;
         padding: 40px;
@@ -203,28 +192,24 @@ st.markdown(f"""
         box-shadow: 0 10px 40px rgba(0,0,0,0.5);
     }}
     
+    /* Contenedores generales */
     .stMarkdown, .stDataFrame {{
         color: #e2e8f0;
     }}
     
+    /* Sidebar oscuro */
     [data-testid="stSidebar"] {{
         background: #1a202c;
-    }}
-    
-    .nutrient-calculator {{
-        background: #374151;
-        padding: 20px;
-        border-radius: 12px;
-        margin: 10px 0;
     }}
 </style>
 """, unsafe_allow_html=True)
 
+# Header principal
 st.markdown(f"""
 <div style='text-align:center; padding: 30px 0; background: linear-gradient(135deg, #2d3748, #1a202c); border-radius: 20px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);'>
     <h1 style='color: {PRIMARY}; font-size: 3em; margin: 0;'>🏥 NefroPredict RD</h1>
     <p style='color: #cbd5e0; font-size: 1.2em; margin-top: 10px;'>Sistema Inteligente de Detección Temprana de ERC</p>
-    <p style='color: #718096; font-size: 0.9em;'>República Dominicana • Versión 2.0 PRO</p>
+    <p style='color: #718096; font-size: 0.9em;'>República Dominicana • Versión 2.0</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -240,7 +225,7 @@ def verify_password(password, hashed):
     """Verifica contraseña"""
     try:
         if not hashed.startswith('$2b$'):
-            return password == hashed
+            return password == hashed  # Compatibilidad con contraseñas antiguas
         return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
     except:
         return False
@@ -293,6 +278,7 @@ class DataStore:
         with open(DB_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
         
+        # Asegurar todas las keys necesarias
         defaults = {
             "users": {},
             "patients": [],
@@ -304,13 +290,15 @@ class DataStore:
             if key not in data:
                 data[key] = default
         
+        # Asegurar estructura de usuario completa
         for username, user in data.get("users", {}).items():
             user['role'] = user.get('role', 'doctor')
             user['active'] = user.get('active', True)
             user['login_attempts'] = user.get('login_attempts', 0)
             if 'created_at' not in user:
-                user['created_at'] = datetime.now().isoformat()
+                 user['created_at'] = datetime.now().isoformat()
 
+        # Guardar la estructura corregida
         with open(DB_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
         return data
@@ -341,11 +329,12 @@ class DataStore:
             self.log_audit(username, "Intento de login - usuario no existe", "LOGIN_FAILED")
             return None
         
+        # Protección contra fuerza bruta
         if user.get("login_attempts", 0) >= 5:
             last_attempt = user.get("last_attempt_time")
             if last_attempt:
                 time_passed = (datetime.now() - datetime.fromisoformat(last_attempt)).seconds
-                if time_passed < 300:
+                if time_passed < 300:  # 5 minutos de bloqueo
                     self.log_audit(username, "Cuenta bloqueada temporalmente", "LOGIN_BLOCKED")
                     return "BLOCKED"
                 else:
@@ -424,10 +413,10 @@ class DataStore:
             "user": user,
             "action": action,
             "type": action_type,
-            "ip": "N/A"
+            "ip": "N/A"  # Streamlit no expone IP fácilmente
         }
         self.data["audit_log"].insert(0, log_entry)
-        self.data["audit_log"] = self.data["audit_log"][:2000]
+        self.data["audit_log"] = self.data["audit_log"][:2000] # Aumentar límite
         self.save()
 
     def get_audit_log(self, limit=100, user_filter=None, type_filter=None):
@@ -441,411 +430,12 @@ class DataStore:
 db = DataStore()
 
 # =============================================
-# MÓDULO DE PLAN DE ACCIÓN INTEGRAL (NUEVO)
-# =============================================
-
-def generar_plan_accion(estadio_erc, riesgo, imc, edad):
-    """
-    Genera un plan de acción integral basado en el estadio ERC y factores clínicos.
-    
-    Returns:
-        dict: Plan completo con nutrición, ejercicio e hidratación
-    """
-    plan = {
-        "nutricion": {},
-        "ejercicio": {},
-        "hidratacion": {},
-        "alertas": []
-    }
-    
-    # PLAN NUTRICIONAL ESPECÍFICO POR ESTADIO
-    if "G1" in estadio_erc or "G2" in estadio_erc:
-        plan["nutricion"] = {
-            "proteinas": "0.8-1.0 g/kg/día (Normal)",
-            "proteinas_detalle": "Puede consumir proteínas sin restricción severa. Prefiera carnes magras, pescado y legumbres.",
-            "sodio": "< 2300 mg/día (2-3g de sal)",
-            "sodio_detalle": "Evite alimentos procesados, embutidos y comidas rápidas.",
-            "potasio": "Sin restricción estricta",
-            "potasio_detalle": "Puede consumir frutas y verduras libremente. Monitoree si usa medicamentos (IECA/ARA-II).",
-            "fosforo": "Sin restricción (800-1000 mg/día)",
-            "liquidos": "Sin restricción, 2-3 litros/día según tolerancia"
-        }
-    elif "G3a" in estadio_erc:
-        plan["nutricion"] = {
-            "proteinas": "0.6-0.8 g/kg/día (Moderada restricción)",
-            "proteinas_detalle": "Reduzca el consumo de carnes rojas. Prefiera pescado blanco, pollo sin piel y claras de huevo.",
-            "sodio": "< 2000 mg/día (Máximo 2g de sal)",
-            "sodio_detalle": "Cocine sin sal. Use especias naturales para dar sabor.",
-            "potasio": "2000-3000 mg/día (Moderación)",
-            "potasio_detalle": "Limite: plátanos, naranjas, tomates, papas. Remoje verduras antes de cocinar.",
-            "fosforo": "800-1000 mg/día (Evite excesos)",
-            "fosforo_detalle": "Reduzca lácteos, frutos secos y bebidas cola.",
-            "liquidos": "1.5-2 litros/día (Consulte si hay edema)"
-        }
-        plan["alertas"].append("⚠️ Considere consulta con nutricionista renal")
-    elif "G3b" in estadio_erc or "G4" in estadio_erc:
-        plan["nutricion"] = {
-            "proteinas": "0.6 g/kg/día (Restricción moderada-severa)",
-            "proteinas_detalle": "CRÍTICO: Limite proteínas. Consulte nutricionista para dieta especializada. Prefiera proteínas de alto valor biológico en pequeñas cantidades.",
-            "sodio": "< 1500 mg/día (Menos de 1.5g sal)",
-            "sodio_detalle": "Evite todo alimento procesado. No agregue sal a las comidas.",
-            "potasio": "1500-2000 mg/día (Restricción)",
-            "potasio_detalle": "EVITE: plátanos, melón, naranjas, tomate, papa, espinacas crudas. Hierva verduras 2 veces.",
-            "fosforo": "600-800 mg/día (Restricción estricta)",
-            "fosforo_detalle": "Evite lácteos, frutos secos, legumbres, refrescos oscuros. Considere quelantes de fósforo si el médico lo indica.",
-            "liquidos": "1-1.5 litros/día (Control estricto según diuresis)"
-        }
-        plan["alertas"].append("🚨 REFERENCIA NUTRICIONAL URGENTE - Dieta renal especializada obligatoria")
-    else:  # G5
-        plan["nutricion"] = {
-            "proteinas": "0.6-0.8 g/kg/día (Ajustar según diálisis)",
-            "proteinas_detalle": "Si está en diálisis, las necesidades aumentan a 1.2 g/kg/día. Siga indicaciones de su nefrólogo.",
-            "sodio": "< 1000 mg/día (Menos de 1g sal) - SIN SAL",
-            "sodio_detalle": "Restricción MÁXIMA. Cero sal agregada.",
-            "potasio": "< 1500 mg/día (Restricción severa)",
-            "potasio_detalle": "Lista de alimentos permitidos/prohibidos con nutricionista. Riesgo de arritmias.",
-            "fosforo": "< 800 mg/día + Quelantes obligatorios",
-            "fosforo_detalle": "Control estricto. Use quelantes de fósforo con cada comida según indicación médica.",
-            "liquidos": "500-1000 ml/día (Restringir severamente - según diuresis residual)"
-        }
-        plan["alertas"].append("🚨🚨 ESTADIO TERMINAL - Manejo con equipo multidisciplinario especializado")
-    
-    # PLAN DE EJERCICIO
-    if imc > 30:
-        intensidad_base = "Baja a Moderada"
-    elif imc > 25:
-        intensidad_base = "Moderada"
-    else:
-        intensidad_base = "Moderada a Vigorosa"
-    
-    if edad > 70:
-        intensidad_base = "Baja (adaptada a adulto mayor)"
-    
-    if "G1" in estadio_erc or "G2" in estadio_erc:
-        plan["ejercicio"] = {
-            "tipo": "Aeróbico + Fuerza",
-            "intensidad": intensidad_base,
-            "frecuencia": "5 días/semana mínimo",
-            "duracion": "150 minutos semanales (30 min/día)",
-            "recomendaciones": "Caminata rápida, natación, ciclismo, ejercicios de resistencia con bandas. Mantener actividad física regular.",
-            "precauciones": "Monitoree presión arterial antes y después del ejercicio si es hipertenso."
-        }
-    elif "G3a" in estadio_erc or "G3b" in estadio_erc:
-        plan["ejercicio"] = {
-            "tipo": "Aeróbico ligero + Flexibilidad",
-            "intensidad": "Moderada (adaptada)",
-            "frecuencia": "3-5 días/semana",
-            "duracion": "20-30 minutos por sesión",
-            "recomendaciones": "Caminata a paso moderado, bicicleta estática, yoga suave, estiramientos. Evite ejercicios de alto impacto.",
-            "precauciones": "Evite deshidratación. Suspenda si hay mareos, dolor torácico o fatiga extrema. Consulte antes de iniciar programa nuevo."
-        }
-        plan["alertas"].append("⚠️ Consulte con su médico antes de iniciar ejercicio intenso")
-    else:  # G4-G5
-        plan["ejercicio"] = {
-            "tipo": "Actividad ligera supervisada",
-            "intensidad": "Baja",
-            "frecuencia": "Según tolerancia (idealmente diario)",
-            "duracion": "10-15 minutos, varias veces al día",
-            "recomendaciones": "Caminatas cortas en casa, estiramientos suaves, ejercicios de respiración. Si está en diálisis, siga programa de ejercicio intradialítico si está disponible.",
-            "precauciones": "NO realizar ejercicio intenso. Evite levantamiento de peso. Monitoreo médico continuo necesario."
-        }
-        plan["alertas"].append("🚨 Ejercicio solo bajo supervisión médica")
-    
-    # CRONOGRAMA DE HIDRATACIÓN
-    if "G1" in estadio_erc or "G2" in estadio_erc:
-        plan["hidratacion"] = {
-            "cantidad_diaria": "2000-3000 ml (8-12 vasos)",
-            "distribucion": "Distribuir durante el día, 250 ml cada 2 horas aprox.",
-            "tipos_liquidos": "Agua pura principalmente. Puede incluir infusiones sin azúcar, agua de coco (moderación).",
-            "evitar": "Bebidas azucaradas, refrescos, alcohol en exceso.",
-            "señales_alerta": "Orina oscura = aumentar ingesta. Hinchazón = reducir y consultar."
-        }
-    elif "G3a" in estadio_erc or "G3b" in estadio_erc:
-        plan["hidratacion"] = {
-            "cantidad_diaria": "1500-2000 ml (6-8 vasos) - Ajustar según diuresis",
-            "distribucion": "Pequeños sorbos frecuentes. 200 ml cada 2-3 horas.",
-            "tipos_liquidos": "Agua pura preferentemente. Limite jugos (alto potasio).",
-            "evitar": "Refrescos, bebidas energéticas, alcohol. Caldos muy salados.",
-            "señales_alerta": "Hinchazón de pies/manos = REDUCIR líquidos y avisar al médico inmediatamente."
-        }
-        plan["alertas"].append("📊 Lleve registro diario de líquidos ingeridos y orina eliminada")
-    else:  # G4-G5
-        plan["hidratacion"] = {
-            "cantidad_diaria": "500-1000 ml (2-4 vasos) - CONTROL ESTRICTO",
-            "distribucion": "Solo para medicamentos y sed intensa. Medir con precisión.",
-            "tipos_liquidos": "Agua pura únicamente. Todo líquido cuenta (sopas, frutas, helados).",
-            "evitar": "TODOS los líquidos no esenciales. Alcohol PROHIBIDO.",
-            "señales_alerta": "Peso diario en ayunas. Aumento de >1 kg en 24h = retención de líquidos, contacte a su nefrólogo."
-        }
-        plan["alertas"].append("🚨🚨 Use vaso medidor. Pese todo líquido. Control vital para evitar edema pulmonar.")
-    
-    return plan
-
-def mostrar_plan_accion(plan, estadio, riesgo):
-    """Muestra el plan de acción en la interfaz con diseño profesional"""
-    
-    st.markdown("---")
-    st.markdown("## 📋 Plan de Acción Integral Personalizado")
-    
-    # Alertas críticas al inicio
-    if plan["alertas"]:
-        for alerta in plan["alertas"]:
-            if "🚨🚨" in alerta:
-                st.markdown(f"<div class='alert-critical'><h3>🚨 ALERTA CRÍTICA</h3><p>{alerta}</p></div>", unsafe_allow_html=True)
-            elif "🚨" in alerta or "⚠️" in alerta:
-                st.error(alerta)
-            else:
-                st.warning(alerta)
-    
-    # Tabs para cada componente del plan
-    tab_nut, tab_ej, tab_hid = st.tabs(["🥗 Nutrición", "🏃 Ejercicio", "💧 Hidratación"])
-    
-    with tab_nut:
-        st.markdown("### 🥗 Plan Nutricional Renal")
-        
-        col_n1, col_n2 = st.columns(2)
-        
-        with col_n1:
-            st.markdown(f"""
-            <div class='action-plan-card'>
-                <h4>🥩 Proteínas</h4>
-                <p style='color:{WARNING}; font-size:1.2em; font-weight:bold;'>{plan['nutricion']['proteinas']}</p>
-                <p style='font-size:0.9em; color:#cbd5e0;'>{plan['nutricion']['proteinas_detalle']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown(f"""
-            <div class='action-plan-card'>
-                <h4>🧂 Sodio</h4>
-                <p style='color:{DANGER}; font-size:1.2em; font-weight:bold;'>{plan['nutricion']['sodio']}</p>
-                <p style='font-size:0.9em; color:#cbd5e0;'>{plan['nutricion']['sodio_detalle']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown(f"""
-            <div class='action-plan-card'>
-                <h4>🍌 Potasio</h4>
-                <p style='color:{WARNING}; font-size:1.2em; font-weight:bold;'>{plan['nutricion']['potasio']}</p>
-                <p style='font-size:0.9em; color:#cbd5e0;'>{plan['nutricion']['potasio_detalle']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col_n2:
-            st.markdown(f"""
-            <div class='action-plan-card'>
-                <h4>🦴 Fósforo</h4>
-                <p style='color:{WARNING}; font-size:1.2em; font-weight:bold;'>{plan['nutricion']['fosforo']}</p>
-                <p style='font-size:0.9em; color:#cbd5e0;'>{plan['nutricion'].get('fosforo_detalle', 'Control de fósforo importante')}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown(f"""
-            <div class='action-plan-card'>
-                <h4>💧 Líquidos</h4>
-                <p style='color:{SECONDARY}; font-size:1.2em; font-weight:bold;'>{plan['nutricion']['liquidos']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-    
-    with tab_ej:
-        st.markdown("### 🏃 Rutina de Ejercicio Recomendada")
-        
-        col_e1, col_e2 = st.columns(2)
-        
-        with col_e1:
-            st.markdown(f"""
-            <div class='action-plan-card'>
-                <h4>🎯 Tipo de Ejercicio</h4>
-                <p style='color:{SUCCESS}; font-weight:bold;'>{plan['ejercicio']['tipo']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown(f"""
-            <div class='action-plan-card'>
-                <h4>⚡ Intensidad</h4>
-                <p style='color:{WARNING}; font-weight:bold;'>{plan['ejercicio']['intensidad']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col_e2:
-            st.markdown(f"""
-            <div class='action-plan-card'>
-                <h4>📅 Frecuencia</h4>
-                <p style='color:{PRIMARY}; font-weight:bold;'>{plan['ejercicio']['frecuencia']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown(f"""
-            <div class='action-plan-card'>
-                <h4>⏱️ Duración</h4>
-                <p style='color:{SECONDARY}; font-weight:bold;'>{plan['ejercicio']['duracion']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        st.info(f"**Recomendaciones:** {plan['ejercicio']['recomendaciones']}")
-        st.warning(f"**⚠️ Precauciones:** {plan['ejercicio']['precauciones']}")
-    
-    with tab_hid:
-        st.markdown("### 💧 Cronograma de Hidratación")
-        
-        st.markdown(f"""
-        <div class='action-plan-card' style='border-left: 5px solid {SECONDARY};'>
-            <h4>💦 Cantidad Diaria Recomendada</h4>
-            <h2 style='color:{SECONDARY}; margin:10px 0;'>{plan['hidratacion']['cantidad_diaria']}</h2>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        col_h1, col_h2 = st.columns(2)
-        
-        with col_h1:
-            st.markdown(f"""
-            <div class='action-plan-card'>
-                <h4>📊 Distribución</h4>
-                <p>{plan['hidratacion']['distribucion']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown(f"""
-            <div class='action-plan-card'>
-                <h4>✅ Líquidos Permitidos</h4>
-                <p>{plan['hidratacion']['tipos_liquidos']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col_h2:
-            st.markdown(f"""
-            <div class='action-plan-card'>
-                <h4>❌ Evitar</h4>
-                <p style='color:{DANGER};'>{plan['hidratacion']['evitar']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown(f"""
-            <div class='action-plan-card'>
-                <h4>🚨 Señales de Alerta</h4>
-                <p style='color:{WARNING};'>{plan['hidratacion']['señales_alerta']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-
-# =============================================
-# CALCULADORA DE NUTRIENTES (NUEVO)
-# =============================================
-
-ALIMENTOS_DB = {
-    "Frutas": {
-        "Manzana (1 mediana)": {"potasio": 195, "fosforo": 20, "sodio": 2, "proteinas": 0.5},
-        "Plátano (1 mediano)": {"potasio": 422, "fosforo": 26, "sodio": 1, "proteinas": 1.3},
-        "Naranja (1 mediana)": {"potasio": 237, "fosforo": 18, "sodio": 0, "proteinas": 1.2},
-        "Uvas (1 taza)": {"potasio": 288, "fosforo": 30, "sodio": 3, "proteinas": 1.1},
-        "Sandía (1 taza)": {"potasio": 170, "fosforo": 15, "sodio": 2, "proteinas": 0.9},
-        "Melón (1 taza)": {"potasio": 427, "fosforo": 27, "sodio": 25, "proteinas": 1.3},
-        "Piña (1 taza)": {"potasio": 180, "fosforo": 13, "sodio": 2, "proteinas": 0.9},
-    },
-    "Vegetales": {
-        "Papa cocida (1 mediana)": {"potasio": 610, "fosforo": 78, "sodio": 10, "proteinas": 3.0},
-        "Tomate (1 mediano)": {"potasio": 292, "fosforo": 30, "sodio": 6, "proteinas": 1.1},
-        "Espinaca cocida (1 taza)": {"potasio": 839, "fosforo": 101, "sodio": 126, "proteinas": 5.3},
-        "Zanahoria (1 taza)": {"potasio": 410, "fosforo": 44, "sodio": 88, "proteinas": 1.2},
-        "Lechuga (1 taza)": {"potasio": 102, "fosforo": 20, "sodio": 10, "proteinas": 0.7},
-        "Pepino (1 taza)": {"potasio": 152, "fosforo": 25, "sodio": 2, "proteinas": 0.7},
-    },
-    "Proteínas": {
-        "Pollo (100g)": {"potasio": 220, "fosforo": 200, "sodio": 70, "proteinas": 27.0},
-        "Pescado (100g)": {"potasio": 400, "fosforo": 250, "sodio": 50, "proteinas": 22.0},
-        "Huevo (1 unidad)": {"potasio": 69, "fosforo": 99, "sodio": 71, "proteinas": 6.3},
-        "Carne res (100g)": {"potasio": 370, "fosforo": 210, "sodio": 60, "proteinas": 26.0},
-    },
-    "Lácteos": {
-        "Leche (1 taza)": {"potasio": 366, "fosforo": 247, "sodio": 107, "proteinas": 8.0},
-        "Yogurt (1 taza)": {"potasio": 380, "fosforo": 250, "sodio": 120, "proteinas": 9.0},
-        "Queso (30g)": {"potasio": 28, "fosforo": 145, "sodio": 180, "proteinas": 7.0},
-    }
-}
-
-def calculadora_nutrientes(estadio_erc):
-    """Calculadora rápida de nutrientes para alimentos comunes"""
-    st.markdown("### 🔢 Calculadora Rápida de Nutrientes")
-    st.info("Verifique si un alimento es seguro según el estadio del paciente")
-    
-    # Establecer límites según estadio
-    if "G1" in estadio_erc or "G2" in estadio_erc:
-        limites = {"potasio": 4000, "fosforo": 1000, "sodio": 2300}
-        nivel_restriccion = "Sin restricciones severas"
-    elif "G3a" in estadio_erc:
-        limites = {"potasio": 3000, "fosforo": 1000, "sodio": 2000}
-        nivel_restriccion = "Restricción Moderada"
-    elif "G3b" in estadio_erc or "G4" in estadio_erc:
-        limites = {"potasio": 2000, "fosforo": 800, "sodio": 1500}
-        nivel_restriccion = "Restricción Estricta"
-    else:  # G5
-        limites = {"potasio": 1500, "fosforo": 800, "sodio": 1000}
-        nivel_restriccion = "Restricción Máxima"
-    
-    st.markdown(f"**Nivel de Restricción:** `{nivel_restriccion}`")
-    st.markdown(f"**Límites diarios:** Potasio ≤ {limites['potasio']}mg | Fósforo ≤ {limites['fosforo']}mg | Sodio ≤ {limites['sodio']}mg")
-    
-    categoria = st.selectbox("Seleccione categoría de alimento", list(ALIMENTOS_DB.keys()))
-    alimento = st.selectbox("Seleccione el alimento", list(ALIMENTOS_DB[categoria].keys()))
-    
-    valores = ALIMENTOS_DB[categoria][alimento]
-    
-    col_calc1, col_calc2, col_calc3, col_calc4 = st.columns(4)
-    
-    # Determinar si es seguro
-    potasio_ok = valores["potasio"] < limites["potasio"] * 0.15  # 15% del límite diario
-    fosforo_ok = valores["fosforo"] < limites["fosforo"] * 0.15
-    sodio_ok = valores["sodio"] < limites["sodio"] * 0.10
-    
-    with col_calc1:
-        color_k = SUCCESS if potasio_ok else DANGER
-        st.markdown(f"""
-        <div class='nutrient-calculator' style='border-left: 4px solid {color_k};'>
-            <p style='margin:0; font-size:0.8em;'>Potasio</p>
-            <h3 style='color:{color_k}; margin:5px 0;'>{valores['potasio']} mg</h3>
-            <p style='font-size:0.7em;'>{"✅ Seguro" if potasio_ok else "⚠️ Alto"}</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col_calc2:
-        color_p = SUCCESS if fosforo_ok else DANGER
-        st.markdown(f"""
-        <div class='nutrient-calculator' style='border-left: 4px solid {color_p};'>
-            <p style='margin:0; font-size:0.8em;'>Fósforo</p>
-            <h3 style='color:{color_p}; margin:5px 0;'>{valores['fosforo']} mg</h3>
-            <p style='font-size:0.7em;'>{"✅ Seguro" if fosforo_ok else "⚠️ Alto"}</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col_calc3:
-        color_na = SUCCESS if sodio_ok else DANGER
-        st.markdown(f"""
-        <div class='nutrient-calculator' style='border-left: 4px solid {color_na};'>
-            <p style='margin:0; font-size:0.8em;'>Sodio</p>
-            <h3 style='color:{color_na}; margin:5px 0;'>{valores['sodio']} mg</h3>
-            <p style='font-size:0.7em;'>{"✅ Seguro" if sodio_ok else "⚠️ Alto"}</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col_calc4:
-        st.markdown(f"""
-        <div class='nutrient-calculator' style='border-left: 4px solid {PRIMARY};'>
-            <p style='margin:0; font-size:0.8em;'>Proteínas</p>
-            <h3 style='color:{PRIMARY}; margin:5px 0;'>{valores['proteinas']} g</h3>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # Recomendación final
-    if potasio_ok and fosforo_ok and sodio_ok:
-        st.success(f"✅ **{alimento}** es SEGURO para consumo moderado en estadio {estadio_erc}")
-    elif not potasio_ok or not fosforo_ok:
-        st.error(f"🚫 **{alimento}** tiene niveles ALTOS de {'potasio' if not potasio_ok else 'fósforo'}. EVITAR o consumir en cantidades mínimas.")
-    else:
-        st.warning(f"⚠️ **{alimento}** puede consumirse con PRECAUCIÓN. Consulte con nutricionista.")
-
-# =============================================
 # MODELO DE PREDICCIÓN Y CLASIFICACIÓN
 # =============================================
 @st.cache_resource
 def load_model():
+    # 🚨 NOTA: Se ha re-habilitado la estructura de carga. 
+    # Para usar el modelo real, debe tener un archivo 'modelo_erc.joblib' en el mismo directorio.
     try:
         if os.path.exists("modelo_erc.joblib"):
             return joblib.load("modelo_erc.joblib")
@@ -857,35 +447,26 @@ def load_model():
 
 model = load_model()
 
-# Validaciones de entrada
-def validar_parametros(edad, creat, glucosa, presion, imc):
-    """Valida que los parámetros clínicos estén en rangos biológicamente posibles"""
-    errores = []
-    
-    if not (18 <= edad <= 120):
-        errores.append("⚠️ Edad debe estar entre 18 y 120 años")
-    if not (0.3 <= creat <= 15.0):
-        errores.append("⚠️ Creatinina debe estar entre 0.3 y 15.0 mg/dL")
-    if not (50 <= glucosa <= 500):
-        errores.append("⚠️ Glucosa debe estar entre 50 y 500 mg/dL")
-    if not (80 <= presion <= 250):
-        errores.append("⚠️ Presión sistólica debe estar entre 80 y 250 mmHg")
-    if not (10.0 <= imc <= 60.0):
-        errores.append("⚠️ IMC debe estar entre 10.0 y 60.0 kg/m²")
-    
-    return errores
-
 def predecir(row):
+    # Estandarización de entradas para TFG
     sexo_tfg = "mujer" if row.get("sexo", "Hombre") == "Mujer" else "hombre"
     raza_tfg = row.get("raza", "No-Afroamericano").lower()
     raza_tfg_input = "afro" if "afro" in raza_tfg else "no_afro"
     
+    # 1. CALCULAR TFG Y ESTADIO
     tfg = calcular_tfg_ckdepi(row["creatinina"], row["edad"], sexo_tfg, raza_tfg_input)
     estadio = clasificar_erc(tfg)
 
+    # 2. PREDICCIÓN DEL RIESGO
     if model is not None:
-        pass
+        # PREDICCIÓN REAL: Formato de entrada dependerá del modelo entrenado
+        # Ejemplo:
+        # features = pd.DataFrame([row]) 
+        # riesgo = model.predict_proba(features)[0][1] * 100
+        # return round(riesgo, 1), tfg, estadio
+        pass # Dejar la simulación mientras no haya modelo
         
+    # Simulación inteligente basada en factores clínicos (Usada si el modelo no carga)
     base = 10
     base += (row["creatinina"] - 1) * 32
     base += max(0, row["glucosa_ayunas"] - 126) * 0.3
@@ -905,6 +486,7 @@ def riesgo_level(risk):
         return "MODERADO", SUCCESS, "Seguimiento Rutinario - Control cada 6 meses", "Normal"
 
 def get_doctor_recommendation(risk):
+    """Genera una recomendación médica detallada (solo para el doctor)."""
     if risk > 70:
         return "REFERENCIA URGENTE a NEFRÓLOGO. Iniciar estudios complementarios de inmediato (Proteinuria 24h/ACR, Fondo de Ojo). Considerar modificación de dieta y tratamiento antihipertensivo con bloqueo del SRAA."
     elif risk > 40:
@@ -917,6 +499,9 @@ def get_doctor_recommendation(risk):
 # =============================================
 
 def calcular_tfg_ckdepi(creatinina, edad, sexo="hombre", raza="no_afro"):
+    """
+    Calcula la Tasa de Filtración Glomerular (TFG) usando la fórmula CKD-EPI (2009).
+    """
     k = 0.7 if sexo == "mujer" else 0.9
     alpha = -0.329 if sexo == "mujer" else -0.411
     raza_factor = 1.159 if raza == "afro" else 1.0
@@ -930,6 +515,7 @@ def calcular_tfg_ckdepi(creatinina, edad, sexo="hombre", raza="no_afro"):
     return round(TFG)
 
 def clasificar_erc(tfg):
+    """Clasifica el estadio de la Enfermedad Renal Crónica (ERC) basado en la TFG."""
     if tfg >= 90:
         return "G1 (Normal o Alto)"
     elif tfg >= 60:
@@ -943,47 +529,42 @@ def clasificar_erc(tfg):
     else:
         return "G5 (Fallo Renal)"
 
-# Clase mejorada para la Generación de PDF
+# Clase para la Generación de PDF
 class PDFReport(FPDF):
-    def __init__(self):
-        super().__init__()
-        self.set_auto_page_break(auto=True, margin=15)
-    
     def header(self):
-        self.set_fill_color(0, 102, 204)
-        self.rect(0, 0, 210, 25, 'F')
+        global PRIMARY
+        # Cambiado a colores RGB para mejor compatibilidad FPDF
+        self.set_fill_color(0, 102, 204) # PRIMARY
+        self.rect(0, 0, 210, 20, 'F')
         self.set_text_color(255, 255, 255)
-        self.set_font('Arial', 'B', 16)
-        self.cell(0, 15, 'NefroPredict RD - Reporte de Evaluacion', 0, 1, 'C')
-        self.set_draw_color(0, 102, 204)
-        self.set_line_width(1.5)
-        self.line(10, 24, 200, 24)
-        self.ln(5)
+        self.set_font('Arial', 'B', 15)
+        self.cell(0, 10, 'NefroPredict RD - Reporte de Evaluación', 0, 1, 'C')
+        self.set_line_width(1.0)
+        self.line(10, 18, 200, 18)
+        self.ln(10)
 
-    def chapter_title(self, title, r=0, g=102, b=204):
+    def chapter_title(self, title, color_hex):
+        r, g, b = tuple(int(color_hex.strip('#')[i:i+2], 16) for i in (0, 2, 4))
         self.set_text_color(r, g, b)
-        self.set_font('Arial', 'B', 13)
-        self.cell(0, 8, title, 0, 1, 'L')
-        self.set_draw_color(r, g, b)
-        self.set_line_width(0.5)
-        self.line(10, self.get_y(), 200, self.get_y())
-        self.ln(3)
+        self.set_font('Arial', 'B', 14)
+        self.cell(0, 10, title, 0, 1, 'L')
+        self.ln(2)
 
     def chapter_body(self, body):
-        self.set_text_color(33, 37, 41)
-        self.set_font('Arial', '', 11)
-        # Manejar caracteres especiales
-        body_encoded = body.encode('latin-1', 'replace').decode('latin-1')
-        self.multi_cell(0, 6, body_encoded)
-        self.ln(2)
+        self.set_text_color(33, 37, 41) # TEXT_DARK
+        self.set_font('Arial', '', 12)
+        self.multi_cell(0, 7, body)
+        self.ln()
         
     def footer(self):
         self.set_y(-15)
         self.set_font('Arial', 'I', 8)
-        self.set_text_color(128, 128, 128)
-        self.cell(0, 10, f'Pagina {self.page_no()}/{{nb}} | Generado: {datetime.now().strftime("%d/%m/%Y %H:%M")}', 0, 0, 'C')
+        self.set_text_color(150, 150, 150)
+        self.cell(0, 10, f'Página {self.page_no()}/{{nb}} | Evaluación generada por NefroPredict RD', 0, 0, 'C')
+
 
 def crear_gauge_riesgo(riesgo):
+    """Gráfico de velocímetro mejorado con corrección RGBA."""
     if riesgo > 70:
         color = DANGER
     elif riesgo > 40:
@@ -1004,6 +585,7 @@ def crear_gauge_riesgo(riesgo):
             'borderwidth': 3,
             'bordercolor': PRIMARY,
             'steps': [
+                # CORRECCIÓN: Usar la función hex_to_rgba para la transparencia
                 {'range': [0, 40], 'color': hex_to_rgba(SUCCESS, 0.2)},
                 {'range': [40, 70], 'color': hex_to_rgba(WARNING, 0.2)},
                 {'range': [70, 100], 'color': hex_to_rgba(DANGER, 0.2)}
@@ -1086,6 +668,7 @@ if not st.session_state.logged_in:
         """, unsafe_allow_html=True)
     st.stop()
 
+# Barra superior mejorada
 st.markdown(f"""
 <div style='background: linear-gradient(135deg, #2d3748, #1a202c); padding:15px 25px; border-radius:15px; margin-bottom:25px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); display:flex; justify-content:space-between; align-items:center;'>
     <div>
@@ -1128,7 +711,7 @@ else:
     tab1, tab2, tab3 = tabs
 
 # =============================================
-# TAB 1: EVALUACIÓN INDIVIDUAL (MEJORADA)
+# TAB 1: EVALUACIÓN INDIVIDUAL
 # =============================================
 with tab1:
     st.markdown("## 📋 Evaluación Individual de Paciente")
@@ -1165,62 +748,44 @@ with tab1:
             if not nombre.strip():
                 st.error("⚠️ El nombre del paciente es obligatorio")
             else:
-                # Validar parámetros
-                errores = validar_parametros(edad, creat, glucosa, presion, imc)
-                if errores:
-                    for error in errores:
-                        st.error(error)
-                else:
-                    datos = {
-                        "edad": edad, "imc": imc, "presion_sistolica": presion,
-                        "glucosa_ayunas": glucosa, "creatinina": creat,
-                        "sexo": sexo_input, "raza": raza_input
-                    }
-                    
-                    riesgo, tfg, estadio = predecir(datos)
-                    nivel, color, reco_publica, _ = riesgo_level(riesgo)
-                    reco_privada = get_doctor_recommendation(riesgo)
-                    
-                    # Generar plan de acción
-                    plan_accion = generar_plan_accion(estadio, riesgo, imc, edad)
-                    
-                    record = {
-                        "nombre_paciente": nombre,
-                        "doctor_user": st.session_state.username,
-                        "doctor_name": st.session_state.doctor_name,
-                        "timestamp": datetime.now().isoformat(),
-                        **datos, 
-                        "riesgo": riesgo, "nivel": nivel, 
-                        "tfg": tfg, "estadio_erc": estadio,
-                        "reco_privada": reco_privada,
-                        "plan_accion": plan_accion
-                    }
-                    db.add_patient(record)
-                    db.log_audit(st.session_state.username, f"Evaluó: {nombre} - {riesgo}%", "EVALUATION")
-                    
-                    st.session_state.ultimo = record
+                # Estandarización de entradas para TFG y Predicción
+                datos = {
+                    "edad": edad, "imc": imc, "presion_sistolica": presion,
+                    "glucosa_ayunas": glucosa, "creatinina": creat,
+                    "sexo": sexo_input, "raza": raza_input
+                }
+                
+                riesgo, tfg, estadio = predecir(datos)
+                nivel, color, reco_publica, _ = riesgo_level(riesgo)
+                reco_privada = get_doctor_recommendation(riesgo)
+                
+                # Guardar
+                record = {
+                    "nombre_paciente": nombre,
+                    "doctor_user": st.session_state.username,
+                    "doctor_name": st.session_state.doctor_name,
+                    "timestamp": datetime.now().isoformat(),
+                    **datos, 
+                    "riesgo": riesgo, "nivel": nivel, 
+                    "tfg": tfg, "estadio_erc": estadio,
+                    "reco_privada": reco_privada # Guardar recomendación privada
+                }
+                db.add_patient(record)
+                db.log_audit(st.session_state.username, f"Evaluó: {nombre} - {riesgo}%", "EVALUATION")
+                
+                st.session_state.ultimo = record
         
         if "ultimo" in st.session_state:
             p = st.session_state.ultimo
             nivel, color, reco_publica, _ = riesgo_level(p["riesgo"])
-            reco_privada = p.get("reco_privada", get_doctor_recommendation(p["riesgo"]))
-            plan_accion = p.get("plan_accion", generar_plan_accion(p["estadio_erc"], p["riesgo"], p["imc"], p["edad"]))
+            reco_privada = p.get("reco_privada", get_doctor_recommendation(p["riesgo"])) # Asegurar reco privada si es registro antiguo
             
             st.markdown("### 📊 Resultado")
             
-            # Alerta crítica mejorada para riesgo muy alto
-            if p["riesgo"] > 70:
-                st.markdown(f"""
-                <div class='alert-critical'>
-                    <h2 style='color:{DANGER}; margin:0;'>🚨 ALERTA CRÍTICA 🚨</h2>
-                    <h3 style='color:white; margin:10px 0;'>RIESGO MUY ALTO DE ERC</h3>
-                    <p style='color:white; font-size:1.1em;'>ACCIÓN INMEDIATA REQUERIDA</p>
-                    <p style='color:#ffcccc;'>Referir a nefrología con URGENCIA</p>
-                </div>
-                """, unsafe_allow_html=True)
-            
+            # Gauge (CORREGIDO)
             st.plotly_chart(crear_gauge_riesgo(p["riesgo"]), use_container_width=True)
             
+            # Tarjeta resultado
             st.markdown(f"""
             <div class='risk-card risk-{"high" if p["riesgo"]>70 else "med" if p["riesgo"]>40 else "low"}'>
                 <h2 style='color:{color}; margin:0; text-shadow: 0 2px 10px rgba(0,0,0,0.3);'>{nivel}</h2>
@@ -1229,11 +794,13 @@ with tab1:
             </div>
             """, unsafe_allow_html=True)
             
+            # Recomendación Privada para el Doctor
             st.markdown("---")
             st.markdown("### 👨‍⚕️ Recomendación para la Toma de Decisión (Solo Doctor)")
             st.warning(f"**Cita Médica Sugerida:** {reco_privada}")
             st.markdown("_Recuerde que esta es una herramienta de ayuda; no sustituye el criterio médico._")
             
+            # Resultados Clínicos y Botón PDF
             st.markdown("---")
             st.markdown("### 🔬 Parámetros Renales Clave")
             
@@ -1254,100 +821,47 @@ with tab1:
                 </div>
                 """, unsafe_allow_html=True)
             
-            # Mostrar Plan de Acción
-            mostrar_plan_accion(plan_accion, p['estadio_erc'], p['riesgo'])
-            
-            # Calculadora de Nutrientes
-            st.markdown("---")
-            calculadora_nutrientes(p['estadio_erc'])
-            
-            # Generación del PDF COMPLETO con Plan de Acción
-            st.markdown("---")
+            # Generación del PDF (Botón de Descarga) - Lógica COMPLETA
             pdf = PDFReport()
-            pdf.alias_nb_pages()
+            pdf.set_auto_page_break(auto=True, margin=15)
             pdf.add_page()
+            pdf.set_font('Arial', '', 12)
             
-            pdf.chapter_title("1. Datos de la Evaluacion", 0, 102, 204)
+            pdf.chapter_title("1. Datos de la Evaluación", PRIMARY)
             pdf.chapter_body(
                 f"Paciente: {p['nombre_paciente']}\n"
                 f"Fecha: {datetime.fromisoformat(p['timestamp']).strftime('%d/%m/%Y %H:%M')}\n"
                 f"Evaluado por: {p['doctor_name']} (@{p['doctor_user']})"
             )
             
-            pdf.chapter_title("2. Parametros de Entrada", 0, 102, 204)
+            pdf.chapter_title("2. Parámetros de Entrada", PRIMARY)
             pdf.chapter_body(
-                f"Edad: {p['edad']} años\n"
-                f"Sexo: {p['sexo']}\n"
-                f"Raza: {p['raza']}\n"
-                f"IMC: {p['imc']} kg/m2\n"
-                f"Creatinina Serica: {p['creatinina']} mg/dL\n"
+                f"Creatinina Sérica: {p['creatinina']} mg/dL\n"
                 f"Glucosa en Ayunas: {p['glucosa_ayunas']} mg/dL\n"
-                f"Presion Sistolica: {p['presion_sistolica']} mmHg"
+                f"Presión Sistólica: {p['presion_sistolica']} mmHg\n"
+                f"IMC: {p['imc']} kg/m²"
             )
             
-            pdf.chapter_title("3. Resultados del Analisis", 0, 168, 150)
-            pdf.set_font('Arial', 'B', 12)
+            pdf.chapter_title("3. Resultados del Análisis", SECONDARY)
             pdf.set_text_color(0, 0, 0)
+            
+            pdf.set_font('Arial', 'B', 12)
             pdf.cell(0, 7, f"Riesgo de ERC: {p['riesgo']:.1f}% ({nivel})", 0, 1, 'L')
-            pdf.cell(0, 7, f"TFG (CKD-EPI): {p['tfg']} ml/min/1.73m2", 0, 1, 'L')
+            pdf.cell(0, 7, f"TFG (CKD-EPI): {p['tfg']} ml/min/1.73m²", 0, 1, 'L')
             pdf.cell(0, 7, f"Estadio de ERC (KDIGO): {p['estadio_erc']}", 0, 1, 'L')
             pdf.ln(5)
             
-            pdf.chapter_title("4. Recomendacion Medica (Confidencial)", 230, 57, 70)
+            pdf.chapter_title("4. Recomendación Médica (Confidencial)", DANGER)
             pdf.chapter_body(reco_privada)
             
-            # NUEVO: Agregar Plan de Acción al PDF
-            pdf.add_page()
-            pdf.chapter_title("5. PLAN DE ACCION INTEGRAL", 0, 102, 204)
+            pdf.chapter_title("5. Nota Legal", WARNING)
+            pdf.chapter_body("Este reporte es generado por NefroPredict RD y está basado en un modelo predictivo. La interpretación y decisión clínica final debe ser siempre realizada por un médico especialista.")
             
-            pdf.chapter_title("5.1 Plan Nutricional", 0, 168, 150)
-            pdf.chapter_body(
-                f"Proteinas: {plan_accion['nutricion']['proteinas']}\n"
-                f"{plan_accion['nutricion']['proteinas_detalle']}\n\n"
-                f"Sodio: {plan_accion['nutricion']['sodio']}\n"
-                f"{plan_accion['nutricion']['sodio_detalle']}\n\n"
-                f"Potasio: {plan_accion['nutricion']['potasio']}\n"
-                f"{plan_accion['nutricion']['potasio_detalle']}\n\n"
-                f"Fosforo: {plan_accion['nutricion']['fosforo']}\n"
-                f"{plan_accion['nutricion'].get('fosforo_detalle', '')}\n\n"
-                f"Liquidos: {plan_accion['nutricion']['liquidos']}"
-            )
-            
-            pdf.chapter_title("5.2 Plan de Ejercicio", 0, 168, 150)
-            pdf.chapter_body(
-                f"Tipo: {plan_accion['ejercicio']['tipo']}\n"
-                f"Intensidad: {plan_accion['ejercicio']['intensidad']}\n"
-                f"Frecuencia: {plan_accion['ejercicio']['frecuencia']}\n"
-                f"Duracion: {plan_accion['ejercicio']['duracion']}\n\n"
-                f"Recomendaciones: {plan_accion['ejercicio']['recomendaciones']}\n\n"
-                f"Precauciones: {plan_accion['ejercicio']['precauciones']}"
-            )
-            
-            pdf.chapter_title("5.3 Cronograma de Hidratacion", 0, 168, 150)
-            pdf.chapter_body(
-                f"Cantidad Diaria: {plan_accion['hidratacion']['cantidad_diaria']}\n"
-                f"Distribucion: {plan_accion['hidratacion']['distribucion']}\n"
-                f"Liquidos Permitidos: {plan_accion['hidratacion']['tipos_liquidos']}\n"
-                f"Evitar: {plan_accion['hidratacion']['evitar']}\n"
-                f"Senales de Alerta: {plan_accion['hidratacion']['señales_alerta']}"
-            )
-            
-            if plan_accion["alertas"]:
-                pdf.chapter_title("6. ALERTAS IMPORTANTES", 230, 57, 70)
-                alertas_text = "\n\n".join(plan_accion["alertas"])
-                pdf.chapter_body(alertas_text)
-            
-            pdf.chapter_title("7. Nota Legal", 247, 127, 0)
-            pdf.chapter_body(
-                "Este reporte es generado por NefroPredict RD y esta basado en un modelo predictivo. "
-                "La interpretacion y decision clinica final debe ser siempre realizada por un medico especialista. "
-                "Este documento contiene informacion medica confidencial del paciente."
-            )
-            
+            # Obtener el contenido del PDF como bytes
             pdf_output = pdf.output(dest='S').encode('latin-1')
             
             st.download_button(
-                label="⬇️ Descargar Reporte Completo PDF",
+                label="⬇️ Descargar Reporte PDF",
                 data=pdf_output,
                 file_name=f"Reporte_NefroPredict_{p['nombre_paciente'].replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf",
                 mime="application/pdf",
@@ -1355,17 +869,18 @@ with tab1:
             )
 
 # =============================================
-# TAB 2: CARGA MASIVA
+# TAB 2: CARGA MASIVA (RE-HABILITADO)
 # =============================================
 with tab2:
     st.markdown("## 📤 Carga Masiva de Pacientes (CSV)")
     st.info("Permite evaluar múltiples pacientes simultáneamente mediante la carga de un archivo CSV.")
     
+    # 1. Descarga de Plantilla
     template_data = {
         "nombre_paciente": ["Ejemplo Juan", "Ejemplo María"],
         "edad": [65, 48],
-        "sexo": ["Hombre", "Mujer"],
-        "raza": ["No-Afroamericano", "Afroamericano"],
+        "sexo": ["Hombre", "Mujer"], # Debe ser "Hombre" o "Mujer"
+        "raza": ["No-Afroamericano", "Afroamericano"], # Debe ser "Afroamericano" o "No-Afroamericano"
         "imc": [32.5, 24.1],
         "presion_sistolica": [150, 125],
         "creatinina": [1.4, 0.9],
@@ -1395,10 +910,12 @@ with tab2:
                     results = []
                     required_cols = list(template_data.keys())
                     
+                    # Validación de columnas
                     if not all(col in df.columns for col in required_cols):
                         st.error(f"❌ Error: El archivo CSV debe contener las columnas: {', '.join(required_cols)}")
                     else:
                         for index, row in df.iterrows():
+                            # Asegurar minúsculas y formatos correctos
                             sexo_input = row['sexo'].strip().title() if pd.notna(row['sexo']) else "Hombre"
                             raza_input = row['raza'].strip().title() if pd.notna(row['raza']) else "No-Afroamericano"
                             
@@ -1409,10 +926,10 @@ with tab2:
                                 "raza": "Afroamericano" if "Afro" in raza_input else "No-Afroamericano"
                             }
                             
+                            # Realizar predicción
                             riesgo, tfg, estadio = predecir(datos)
                             nivel, _, _, _ = riesgo_level(riesgo)
                             reco_privada = get_doctor_recommendation(riesgo)
-                            plan_accion = generar_plan_accion(estadio, riesgo, datos["imc"], datos["edad"])
                             
                             record = {
                                 "nombre_paciente": row['nombre_paciente'],
@@ -1422,8 +939,7 @@ with tab2:
                                 **datos, 
                                 "riesgo": riesgo, "nivel": nivel, 
                                 "tfg": tfg, "estadio_erc": estadio,
-                                "reco_privada": reco_privada,
-                                "plan_accion": plan_accion
+                                "reco_privada": reco_privada
                             }
                             db.add_patient(record)
                             results.append(record)
@@ -1439,7 +955,7 @@ with tab2:
             st.error(f"❌ Ocurrió un error al leer/procesar el archivo: {e}")
 
 # =============================================
-# TAB 3: HISTORIAL DE EVALUACIONES
+# TAB 3: HISTORIAL DE EVALUACIONES (RE-HABILITADO)
 # =============================================
 with tab3:
     st.markdown("## 📊 Historial de Evaluaciones")
@@ -1527,13 +1043,14 @@ if st.session_state.role == "admin":
                             db.update_password(index, new_temp_pwd, st.session_state.username)
                             st.success(f"Contraseña de @{index} reseteada. Nueva temporal: **{new_temp_pwd}** (¡Informar al usuario!)")
                     with col_d:
-                        if st.button("🗑️ Eliminar", key=f"delete_{index}", use_container_width=True):
+                         if st.button("🗑️ Eliminar", key=f"delete_{index}", use_container_width=True):
                             db.delete_doctor(index, st.session_state.username)
                             st.rerun()
                             
                 st.markdown("---")
         else:
             st.info("No hay otros usuarios doctores registrados.")
+
 
     # =============================================
     # TAB 5: ESTADÍSTICAS (ADMIN SOLAMENTE)
@@ -1583,6 +1100,7 @@ if st.session_state.role == "admin":
                                                          'G4 (Disminución Severa)': DANGER, 'G5 (Fallo Renal)': DANGER})
                 fig_estadio.update_layout(xaxis_title="Estadio KDIGO", yaxis_title="Número de Pacientes", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='white')
                 st.plotly_chart(fig_estadio, use_container_width=True)
+                
 
     # =============================================
     # TAB 6: AUDITORÍA (ADMIN SOLAMENTE)
@@ -1597,4 +1115,23 @@ if st.session_state.role == "admin":
         
         with col_filters[0]:
             user_filter = st.selectbox("Filtrar por Usuario", user_options)
-        with col_
+        with col_filters[1]:
+            type_filter = st.selectbox("Filtrar por Tipo de Acción", type_options)
+        with col_filters[2]:
+            limit = st.number_input("Límite de Registros", 10, 2000, 100)
+            
+        audit_logs = db.get_audit_log(limit, user_filter, type_filter)
+        
+        if audit_logs:
+            df_audit = pd.DataFrame(audit_logs)
+            df_audit['timestamp'] = pd.to_datetime(df_audit['timestamp']).dt.strftime('%Y-%m-%d %H:%M:%S')
+            st.dataframe(df_audit, use_container_width=True)
+        else:
+            st.info("No se encontraron registros con los filtros seleccionados.")
+
+st.markdown("""
+<div class='footer'>
+    <p>© 2024 NefroPredict RD. Desarrollado con ❤️ para la salud renal dominicana.</p>
+    <p>Herramienta de soporte clínico. Consulta médica siempre necesaria.</p>
+</div>
+""", unsafe_allow_html=True)
