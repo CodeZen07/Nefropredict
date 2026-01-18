@@ -23,15 +23,14 @@ st.set_page_config(
 )
 
 # Paleta de colores médica profesional
-PRIMARY = "#0066CC"      # Azul médico profesional
-SECONDARY = "#00A896"    # Verde azulado (salud)
-DANGER = "#E63946"       # Rojo médico
-WARNING = "#F77F00"      # Naranja cálido
-SUCCESS = "#06D6A0"      # Verde éxito
+PRIMARY = "#0066CC"
+SECONDARY = "#00A896"
+DANGER = "#E63946"
+WARNING = "#F77F00"
+SUCCESS = "#06D6A0"
 BG_LIGHT = "#F8F9FA"
 TEXT_DARK = "#212529"
 
-# Función auxiliar para convertir HEX a RGBA
 def hex_to_rgba(hex_color, alpha):
     """Convierte un color hexadecimal de 6 dígitos a una cadena RGBA."""
     hex_color = hex_color.lstrip('#')
@@ -41,7 +40,6 @@ def hex_to_rgba(hex_color, alpha):
     except ValueError:
         return 'rgba(128, 128, 128, 0.2)'
 
-
 st.markdown(f"""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -50,7 +48,6 @@ st.markdown(f"""
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }}
     
-    /* Estilos generales */
     .main {{
         background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
     }}
@@ -60,7 +57,6 @@ st.markdown(f"""
         font-weight: 600 !important;
     }}
     
-    /* Botones mejorados */
     .stButton>button {{
         background: linear-gradient(135deg, {PRIMARY}, {SECONDARY});
         color: white;
@@ -78,7 +74,6 @@ st.markdown(f"""
         box-shadow: 0 6px 20px rgba(0,102,204,0.3);
     }}
     
-    /* Cards de métricas */
     .metric-card {{
         background: #2d3748;
         padding: 25px;
@@ -94,7 +89,6 @@ st.markdown(f"""
         box-shadow: 0 8px 25px rgba(0,0,0,0.12);
     }}
     
-    /* Tarjetas de riesgo */
     .risk-card {{
         padding: 30px;
         border-radius: 20px;
@@ -123,7 +117,6 @@ st.markdown(f"""
         border: 3px solid {SUCCESS};
     }}
     
-    /* Tabs personalizados */
     .stTabs [data-baseweb="tab-list"] {{
         gap: 10px;
         background: #2d3748;
@@ -145,7 +138,6 @@ st.markdown(f"""
         color: white !important;
     }}
     
-    /* Inputs mejorados */
     .stTextInput input, .stNumberInput input, .stSelectbox select {{
         border-radius: 10px;
         border: 2px solid #4a5568;
@@ -160,12 +152,10 @@ st.markdown(f"""
         background: #374151;
     }}
     
-    /* Labels de inputs */
     .stTextInput label, .stNumberInput label, .stSelectbox label {{
         color: #e2e8f0 !important;
     }}
     
-    /* Notificaciones */
     .stSuccess, .stError, .stWarning, .stInfo {{
         border-radius: 10px;
         border-left: 5px solid;
@@ -173,7 +163,6 @@ st.markdown(f"""
         color: white;
     }}
     
-    /* Footer */
     .footer {{
         text-align: center;
         padding: 20px;
@@ -184,7 +173,6 @@ st.markdown(f"""
         margin-top: 30px;
     }}
     
-    /* Login especial */
     .login-container {{
         background: #2d3748;
         padding: 40px;
@@ -192,19 +180,16 @@ st.markdown(f"""
         box-shadow: 0 10px 40px rgba(0,0,0,0.5);
     }}
     
-    /* Contenedores generales */
     .stMarkdown, .stDataFrame {{
         color: #e2e8f0;
     }}
     
-    /* Sidebar oscuro */
     [data-testid="stSidebar"] {{
         background: #1a202c;
     }}
 </style>
 """, unsafe_allow_html=True)
 
-# Header principal
 st.markdown(f"""
 <div style='text-align:center; padding: 30px 0; background: linear-gradient(135deg, #2d3748, #1a202c); border-radius: 20px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);'>
     <h1 style='color: {PRIMARY}; font-size: 3em; margin: 0;'>🏥 NefroPredict RD</h1>
@@ -225,7 +210,7 @@ def verify_password(password, hashed):
     """Verifica contraseña"""
     try:
         if not hashed.startswith('$2b$'):
-            return password == hashed  # Compatibilidad con contraseñas antiguas
+            return password == hashed
         return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
     except:
         return False
@@ -278,7 +263,6 @@ class DataStore:
         with open(DB_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
         
-        # Asegurar todas las keys necesarias
         defaults = {
             "users": {},
             "patients": [],
@@ -290,15 +274,13 @@ class DataStore:
             if key not in data:
                 data[key] = default
         
-        # Asegurar estructura de usuario completa
         for username, user in data.get("users", {}).items():
             user['role'] = user.get('role', 'doctor')
             user['active'] = user.get('active', True)
             user['login_attempts'] = user.get('login_attempts', 0)
             if 'created_at' not in user:
-                 user['created_at'] = datetime.now().isoformat()
+                user['created_at'] = datetime.now().isoformat()
 
-        # Guardar la estructura corregida
         with open(DB_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
         return data
@@ -329,12 +311,11 @@ class DataStore:
             self.log_audit(username, "Intento de login - usuario no existe", "LOGIN_FAILED")
             return None
         
-        # Protección contra fuerza bruta
         if user.get("login_attempts", 0) >= 5:
             last_attempt = user.get("last_attempt_time")
             if last_attempt:
                 time_passed = (datetime.now() - datetime.fromisoformat(last_attempt)).seconds
-                if time_passed < 300:  # 5 minutos de bloqueo
+                if time_passed < 300:
                     self.log_audit(username, "Cuenta bloqueada temporalmente", "LOGIN_BLOCKED")
                     return "BLOCKED"
                 else:
@@ -413,10 +394,10 @@ class DataStore:
             "user": user,
             "action": action,
             "type": action_type,
-            "ip": "N/A"  # Streamlit no expone IP fácilmente
+            "ip": "N/A"
         }
         self.data["audit_log"].insert(0, log_entry)
-        self.data["audit_log"] = self.data["audit_log"][:2000] # Aumentar límite
+        self.data["audit_log"] = self.data["audit_log"][:2000]
         self.save()
 
     def get_audit_log(self, limit=100, user_filter=None, type_filter=None):
@@ -434,8 +415,6 @@ db = DataStore()
 # =============================================
 @st.cache_resource
 def load_model():
-    # 🚨 NOTA: Se ha re-habilitado la estructura de carga. 
-    # Para usar el modelo real, debe tener un archivo 'modelo_erc.joblib' en el mismo directorio.
     try:
         if os.path.exists("modelo_erc.joblib"):
             return joblib.load("modelo_erc.joblib")
@@ -448,25 +427,16 @@ def load_model():
 model = load_model()
 
 def predecir(row):
-    # Estandarización de entradas para TFG
     sexo_tfg = "mujer" if row.get("sexo", "Hombre") == "Mujer" else "hombre"
     raza_tfg = row.get("raza", "No-Afroamericano").lower()
     raza_tfg_input = "afro" if "afro" in raza_tfg else "no_afro"
     
-    # 1. CALCULAR TFG Y ESTADIO
     tfg = calcular_tfg_ckdepi(row["creatinina"], row["edad"], sexo_tfg, raza_tfg_input)
     estadio = clasificar_erc(tfg)
 
-    # 2. PREDICCIÓN DEL RIESGO
     if model is not None:
-        # PREDICCIÓN REAL: Formato de entrada dependerá del modelo entrenado
-        # Ejemplo:
-        # features = pd.DataFrame([row]) 
-        # riesgo = model.predict_proba(features)[0][1] * 100
-        # return round(riesgo, 1), tfg, estadio
-        pass # Dejar la simulación mientras no haya modelo
+        pass
         
-    # Simulación inteligente basada en factores clínicos (Usada si el modelo no carga)
     base = 10
     base += (row["creatinina"] - 1) * 32
     base += max(0, row["glucosa_ayunas"] - 126) * 0.3
@@ -499,9 +469,7 @@ def get_doctor_recommendation(risk):
 # =============================================
 
 def calcular_tfg_ckdepi(creatinina, edad, sexo="hombre", raza="no_afro"):
-    """
-    Calcula la Tasa de Filtración Glomerular (TFG) usando la fórmula CKD-EPI (2009).
-    """
+    """Calcula la Tasa de Filtración Glomerular (TFG) usando la fórmula CKD-EPI (2009)."""
     k = 0.7 if sexo == "mujer" else 0.9
     alpha = -0.329 if sexo == "mujer" else -0.411
     raza_factor = 1.159 if raza == "afro" else 1.0
@@ -529,16 +497,13 @@ def clasificar_erc(tfg):
     else:
         return "G5 (Fallo Renal)"
 
-# Clase para la Generación de PDF
 class PDFReport(FPDF):
     def header(self):
-        global PRIMARY
-        # Cambiado a colores RGB para mejor compatibilidad FPDF
-        self.set_fill_color(0, 102, 204) # PRIMARY
+        self.set_fill_color(0, 102, 204)
         self.rect(0, 0, 210, 20, 'F')
         self.set_text_color(255, 255, 255)
         self.set_font('Arial', 'B', 15)
-        self.cell(0, 10, 'NefroPredict RD - Reporte de Evaluación', 0, 1, 'C')
+        self.cell(0, 10, 'NefroPredict RD - Reporte de Evaluacion', 0, 1, 'C')
         self.set_line_width(1.0)
         self.line(10, 18, 200, 18)
         self.ln(10)
@@ -551,17 +516,16 @@ class PDFReport(FPDF):
         self.ln(2)
 
     def chapter_body(self, body):
-        self.set_text_color(33, 37, 41) # TEXT_DARK
+        self.set_text_color(33, 37, 41)
         self.set_font('Arial', '', 12)
-        self.multi_cell(0, 7, body)
+        self.multi_cell(0, 7, body.encode('latin-1', 'replace').decode('latin-1'))
         self.ln()
         
     def footer(self):
         self.set_y(-15)
         self.set_font('Arial', 'I', 8)
         self.set_text_color(150, 150, 150)
-        self.cell(0, 10, f'Página {self.page_no()}/{{nb}} | Evaluación generada por NefroPredict RD', 0, 0, 'C')
-
+        self.cell(0, 10, f'Pagina {self.page_no()}/{{nb}} | Evaluacion generada por NefroPredict RD', 0, 0, 'C')
 
 def crear_gauge_riesgo(riesgo):
     """Gráfico de velocímetro mejorado con corrección RGBA."""
@@ -585,7 +549,6 @@ def crear_gauge_riesgo(riesgo):
             'borderwidth': 3,
             'bordercolor': PRIMARY,
             'steps': [
-                # CORRECCIÓN: Usar la función hex_to_rgba para la transparencia
                 {'range': [0, 40], 'color': hex_to_rgba(SUCCESS, 0.2)},
                 {'range': [40, 70], 'color': hex_to_rgba(WARNING, 0.2)},
                 {'range': [70, 100], 'color': hex_to_rgba(DANGER, 0.2)}
@@ -668,7 +631,6 @@ if not st.session_state.logged_in:
         """, unsafe_allow_html=True)
     st.stop()
 
-# Barra superior mejorada
 st.markdown(f"""
 <div style='background: linear-gradient(135deg, #2d3748, #1a202c); padding:15px 25px; border-radius:15px; margin-bottom:25px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); display:flex; justify-content:space-between; align-items:center;'>
     <div>
@@ -748,7 +710,6 @@ with tab1:
             if not nombre.strip():
                 st.error("⚠️ El nombre del paciente es obligatorio")
             else:
-                # Estandarización de entradas para TFG y Predicción
                 datos = {
                     "edad": edad, "imc": imc, "presion_sistolica": presion,
                     "glucosa_ayunas": glucosa, "creatinina": creat,
@@ -759,7 +720,6 @@ with tab1:
                 nivel, color, reco_publica, _ = riesgo_level(riesgo)
                 reco_privada = get_doctor_recommendation(riesgo)
                 
-                # Guardar
                 record = {
                     "nombre_paciente": nombre,
                     "doctor_user": st.session_state.username,
@@ -768,7 +728,7 @@ with tab1:
                     **datos, 
                     "riesgo": riesgo, "nivel": nivel, 
                     "tfg": tfg, "estadio_erc": estadio,
-                    "reco_privada": reco_privada # Guardar recomendación privada
+                    "reco_privada": reco_privada
                 }
                 db.add_patient(record)
                 db.log_audit(st.session_state.username, f"Evaluó: {nombre} - {riesgo}%", "EVALUATION")
@@ -778,14 +738,12 @@ with tab1:
         if "ultimo" in st.session_state:
             p = st.session_state.ultimo
             nivel, color, reco_publica, _ = riesgo_level(p["riesgo"])
-            reco_privada = p.get("reco_privada", get_doctor_recommendation(p["riesgo"])) # Asegurar reco privada si es registro antiguo
+            reco_privada = p.get("reco_privada", get_doctor_recommendation(p["riesgo"]))
             
             st.markdown("### 📊 Resultado")
             
-            # Gauge (CORREGIDO)
             st.plotly_chart(crear_gauge_riesgo(p["riesgo"]), use_container_width=True)
             
-            # Tarjeta resultado
             st.markdown(f"""
             <div class='risk-card risk-{"high" if p["riesgo"]>70 else "med" if p["riesgo"]>40 else "low"}'>
                 <h2 style='color:{color}; margin:0; text-shadow: 0 2px 10px rgba(0,0,0,0.3);'>{nivel}</h2>
@@ -794,13 +752,11 @@ with tab1:
             </div>
             """, unsafe_allow_html=True)
             
-            # Recomendación Privada para el Doctor
             st.markdown("---")
             st.markdown("### 👨‍⚕️ Recomendación para la Toma de Decisión (Solo Doctor)")
             st.warning(f"**Cita Médica Sugerida:** {reco_privada}")
             st.markdown("_Recuerde que esta es una herramienta de ayuda; no sustituye el criterio médico._")
             
-            # Resultados Clínicos y Botón PDF
             st.markdown("---")
             st.markdown("### 🔬 Parámetros Renales Clave")
             
@@ -821,28 +777,28 @@ with tab1:
                 </div>
                 """, unsafe_allow_html=True)
             
-            # Generación del PDF (Botón de Descarga) - Lógica COMPLETA
             pdf = PDFReport()
+            pdf.alias_nb_pages()
             pdf.set_auto_page_break(auto=True, margin=15)
             pdf.add_page()
             pdf.set_font('Arial', '', 12)
             
-            pdf.chapter_title("1. Datos de la Evaluación", PRIMARY)
+            pdf.chapter_title("1. Datos de la Evaluacion", PRIMARY)
             pdf.chapter_body(
                 f"Paciente: {p['nombre_paciente']}\n"
                 f"Fecha: {datetime.fromisoformat(p['timestamp']).strftime('%d/%m/%Y %H:%M')}\n"
                 f"Evaluado por: {p['doctor_name']} (@{p['doctor_user']})"
             )
             
-            pdf.chapter_title("2. Parámetros de Entrada", PRIMARY)
+            pdf.chapter_title("2. Parametros de Entrada", PRIMARY)
             pdf.chapter_body(
-                f"Creatinina Sérica: {p['creatinina']} mg/dL\n"
+                f"Creatinina Serica: {p['creatinina']} mg/dL\n"
                 f"Glucosa en Ayunas: {p['glucosa_ayunas']} mg/dL\n"
-                f"Presión Sistólica: {p['presion_sistolica']} mmHg\n"
+                f"Presion Sistolica: {p['presion_sistolica']} mmHg\n"
                 f"IMC: {p['imc']} kg/m²"
             )
             
-            pdf.chapter_title("3. Resultados del Análisis", SECONDARY)
+            pdf.chapter_title("3. Resultados del Analisis", SECONDARY)
             pdf.set_text_color(0, 0, 0)
             
             pdf.set_font('Arial', 'B', 12)
@@ -851,13 +807,12 @@ with tab1:
             pdf.cell(0, 7, f"Estadio de ERC (KDIGO): {p['estadio_erc']}", 0, 1, 'L')
             pdf.ln(5)
             
-            pdf.chapter_title("4. Recomendación Médica (Confidencial)", DANGER)
+            pdf.chapter_title("4. Recomendacion Medica (Confidencial)", DANGER)
             pdf.chapter_body(reco_privada)
             
             pdf.chapter_title("5. Nota Legal", WARNING)
-            pdf.chapter_body("Este reporte es generado por NefroPredict RD y está basado en un modelo predictivo. La interpretación y decisión clínica final debe ser siempre realizada por un médico especialista.")
+            pdf.chapter_body("Este reporte es generado por NefroPredict RD y esta basado en un modelo predictivo. La interpretacion y decision clinica final debe ser siempre realizada por un medico especialista.")
             
-            # Obtener el contenido del PDF como bytes
             pdf_output = pdf.output(dest='S').encode('latin-1')
             
             st.download_button(
@@ -868,19 +823,15 @@ with tab1:
                 use_container_width=True
             )
 
-# =============================================
-# TAB 2: CARGA MASIVA (RE-HABILITADO)
-# =============================================
 with tab2:
     st.markdown("## 📤 Carga Masiva de Pacientes (CSV)")
     st.info("Permite evaluar múltiples pacientes simultáneamente mediante la carga de un archivo CSV.")
     
-    # 1. Descarga de Plantilla
     template_data = {
         "nombre_paciente": ["Ejemplo Juan", "Ejemplo María"],
         "edad": [65, 48],
-        "sexo": ["Hombre", "Mujer"], # Debe ser "Hombre" o "Mujer"
-        "raza": ["No-Afroamericano", "Afroamericano"], # Debe ser "Afroamericano" o "No-Afroamericano"
+        "sexo": ["Hombre", "Mujer"],
+        "raza": ["No-Afroamericano", "Afroamericano"],
         "imc": [32.5, 24.1],
         "presion_sistolica": [150, 125],
         "creatinina": [1.4, 0.9],
@@ -910,12 +861,10 @@ with tab2:
                     results = []
                     required_cols = list(template_data.keys())
                     
-                    # Validación de columnas
                     if not all(col in df.columns for col in required_cols):
                         st.error(f"❌ Error: El archivo CSV debe contener las columnas: {', '.join(required_cols)}")
                     else:
                         for index, row in df.iterrows():
-                            # Asegurar minúsculas y formatos correctos
                             sexo_input = row['sexo'].strip().title() if pd.notna(row['sexo']) else "Hombre"
                             raza_input = row['raza'].strip().title() if pd.notna(row['raza']) else "No-Afroamericano"
                             
@@ -926,7 +875,6 @@ with tab2:
                                 "raza": "Afroamericano" if "Afro" in raza_input else "No-Afroamericano"
                             }
                             
-                            # Realizar predicción
                             riesgo, tfg, estadio = predecir(datos)
                             nivel, _, _, _ = riesgo_level(riesgo)
                             reco_privada = get_doctor_recommendation(riesgo)
@@ -954,9 +902,6 @@ with tab2:
         except Exception as e:
             st.error(f"❌ Ocurrió un error al leer/procesar el archivo: {e}")
 
-# =============================================
-# TAB 3: HISTORIAL DE EVALUACIONES (RE-HABILITADO)
-# =============================================
 with tab3:
     st.markdown("## 📊 Historial de Evaluaciones")
     
@@ -979,9 +924,6 @@ with tab3:
             
         st.dataframe(df_historial[cols_to_display].sort_values(by='Fecha', ascending=False), use_container_width=True)
 
-# =============================================
-# TAB 4: GESTIÓN DE USUARIOS (ADMIN SOLAMENTE)
-# =============================================
 if st.session_state.role == "admin":
     with tab4:
         st.markdown("## 👥 Gestión de Doctores")
@@ -1015,10 +957,10 @@ if st.session_state.role == "admin":
         user_list = db.data['users']
         doctor_users = {u: data for u, data in user_list.items() if data.get('role') == 'doctor'}
         
-        df_users = pd.DataFrame(doctor_users).T
-        df_users = df_users[['name', 'role', 'active', 'created_at', 'last_login']]
-        
-        if not df_users.empty:
+        if doctor_users:
+            df_users = pd.DataFrame(doctor_users).T
+            df_users = df_users[['name', 'role', 'active', 'created_at', 'last_login']]
+            
             for index, row in df_users.iterrows():
                 col_name, col_status, col_actions = st.columns([2, 1, 3])
                 
@@ -1043,7 +985,7 @@ if st.session_state.role == "admin":
                             db.update_password(index, new_temp_pwd, st.session_state.username)
                             st.success(f"Contraseña de @{index} reseteada. Nueva temporal: **{new_temp_pwd}** (¡Informar al usuario!)")
                     with col_d:
-                         if st.button("🗑️ Eliminar", key=f"delete_{index}", use_container_width=True):
+                        if st.button("🗑️ Eliminar", key=f"delete_{index}", use_container_width=True):
                             db.delete_doctor(index, st.session_state.username)
                             st.rerun()
                             
@@ -1051,10 +993,6 @@ if st.session_state.role == "admin":
         else:
             st.info("No hay otros usuarios doctores registrados.")
 
-
-    # =============================================
-    # TAB 5: ESTADÍSTICAS (ADMIN SOLAMENTE)
-    # =============================================
     with tab5:
         st.markdown("## 📈 Estadísticas Globales del Sistema")
         all_patients = db.get_all_patients()
@@ -1100,11 +1038,7 @@ if st.session_state.role == "admin":
                                                          'G4 (Disminución Severa)': DANGER, 'G5 (Fallo Renal)': DANGER})
                 fig_estadio.update_layout(xaxis_title="Estadio KDIGO", yaxis_title="Número de Pacientes", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='white')
                 st.plotly_chart(fig_estadio, use_container_width=True)
-                
 
-    # =============================================
-    # TAB 6: AUDITORÍA (ADMIN SOLAMENTE)
-    # =============================================
     with tab6:
         st.markdown("## 🔍 Registro de Auditoría y Seguridad")
         st.info("Muestra las acciones clave del sistema: logins, creación de usuarios, evaluaciones, etc.")
@@ -1135,3 +1069,4 @@ st.markdown("""
     <p>Herramienta de soporte clínico. Consulta médica siempre necesaria.</p>
 </div>
 """, unsafe_allow_html=True)
+        "
