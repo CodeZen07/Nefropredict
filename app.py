@@ -13,7 +13,7 @@ from io import BytesIO
 from fpdf import FPDF
 
 # =============================================
-# 1. CONFIGURACIÓN Y ESTILOS [2-4]
+# CONFIGURACIÓN Y ESTILOS
 # =============================================
 st.set_page_config(
     page_title="NefroPredict RD",
@@ -22,7 +22,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-PRIMARY = "#0066CC"
+PRIMARY = "#0066CC" 
 SECONDARY = "#00A896"
 DANGER = "#E63946"
 WARNING = "#F77F00"
@@ -46,36 +46,61 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # =============================================
-# 2. SEGURIDAD Y BASE DE DATOS [5-9]
+# SEGURIDAD Y BASE DE DATOS
 # =============================================
-DB_FILE = "nefro_db.json"
-
 def hash_password(password):
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 def verify_password(password, hashed):
     try:
-        if not hashed.startswith('$2b$'): return password == hashed
+        if not hashed.startswith('$2b$'):
+            return password == hashed 
         return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
-    except: return False
+    except:
+        return False
+
+def generate_session_token():
+    return secrets.token_urlsafe(32)
+
+def check_password_strength(password):
+    if len(password) < 8: return False, "Mínimo 8 caracteres"
+    if not any(c.isdigit() for c in password): return False, "Falta número"
+    if not any(c.isupper() for c in password): return False, "Falta mayúscula"
+    return True, "Segura"
+
+DB_FILE = "nefro_db.json"
 
 class DataStore:
     def __init__(self):
-        if not os.path.exists(DB_FILE): self._create_initial_db()
+        if not os.path.exists(DB_FILE):
+            self._create_initial_db()
         self.data = self._load()
         self._migrate_passwords()
 
     def _create_initial_db(self):
         initial = {
-            "users": {"admin": {"pwd": hash_password("Admin2024!"), "role": "admin", "name": "Administrador", "active": True, "created_at": datetime.now().isoformat(), "last_login": None, "login_attempts": 0}},
+            "users": {
+                "admin": {
+                    "pwd": hash_password("Admin2024!"),
+                    "role": "admin",
+                    "name": "Administrador",
+                    "active": True,
+                    "created_at": datetime.now().isoformat(),
+                    "last_login": None,
+                    "login_attempts": 0
+                }
+            },
             "patients": [], "uploads": [], "audit_log": [], "sessions": {}
         }
-        with open(DB_FILE, "w", encoding="utf-8") as f: json.dump(initial, f, indent=4, ensure_ascii=False)
+        with open(DB_FILE, "w", encoding="utf-8") as f:
+            json.dump(initial, f, indent=4, ensure_ascii=False)
 
     def _load(self):
-        with open(DB_FILE, "r", encoding="utf-8") as f: data = json.load(f)
-        for key in ["users", "patients", "uploads", "audit_log", "sessions"]:
-            if key not in data: data[key] = [] if key != "users" and key != "sessions" else {}
+        with open(DB_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        defaults = {"users": {}, "patients": [], "uploads": [], "audit_log": [], "sessions": {}}
+        for key, default in defaults.items():
+            if key not in data: data[key] = default
         return data
 
     def _migrate_passwords(self):
@@ -88,23 +113,37 @@ class DataStore:
         if migrated: self.save()
 
     def save(self):
-        with open(DB_FILE, "w", encoding="utf-8") as f: json.dump(self.data, f, indent=4, ensure_ascii=False)
+        with open(DB_FILE, "w", encoding="utf-8") as f:
+            json.dump(self.data, f, indent=4, ensure_ascii=False)
+
+    def get_user(self, username):
+        return self.data["users"].get(username)
 
     def verify_login(self, username, password):
-        user = self.data["users"].get(username)
+        user = self.get_user(username)
         if not user: return None
+        if user.get("login_attempts", 0) >= 5:
+            last_attempt = user.get("last_attempt_time")
+            if last_attempt:
+                time_passed = (datetime.now() - datetime.fromisoformat(last_attempt)).seconds
+                if time_passed < 300: return "BLOCKED"
+        
         if verify_password(password, user.get("pwd", "")):
             if user.get("active", True):
+                user["login_attempts"] = 0
                 user["last_login"] = datetime.now().isoformat()
                 self.save()
-                self.log_audit(username, "Inicio de sesión exitoso", "LOGIN")
+                self.log_audit(username, "Inicio de sesión", "LOGIN")
                 return user
+        else:
+            user["login_attempts"] = user.get("login_attempts", 0) + 1
+            user["last_attempt_time"] = datetime.now().isoformat()
+            self.save()
         return None
 
     def log_audit(self, user, action, action_type="INFO"):
         log_entry = {"timestamp": datetime.now().isoformat(), "user": user, "action": action, "type": action_type}
-        self.data["audit_log"].insert(0, log_entry)
-        self.data["audit_log"] = self.data["audit_log"][:2000]
+        self.data.setdefault("audit_log", []).insert(0, log_entry)
         self.save()
 
     def add_patient(self, record):
@@ -112,7 +151,32 @@ class DataStore:
         self.save()
 
     def get_all_patients(self): return self.data["patients"]
-    def get_patients_by_doctor(self, user_id): return [p for p in self.data["patients"] if p.get("doctor_user") == user_id]
+    def get_patients_by_doctor(self, user_id):
+        return [p for p in self.data["patients"] if p.get("doctor_user") == user_id]
+
+    def create_doctor(self, username, password, full_name, created_by="admin"):
+        self.data["users"][username] = {
+            "pwd": hash_password(password), "role": "doctor", "name": full_name,
+            "active": True, "created_at": datetime.now().isoformat(),
+            "created_by": created_by, "last_login": None, "login_attempts": 0
+        }
+        self.save()
+
+    def toggle_active(self, username, toggled_by="admin"):
+        if username in self.data["users"]:
+            self.data["users"][username]["active"] = not self.data["users"][username]["active"]
+            self.save()
+
+    def delete_doctor(self, username, deleted_by="admin"):
+        if username in self.data["users"]:
+            del self.data["users"][username]
+            self.save()
+
+    def update_password(self, username, new_pwd, updated_by="admin"):
+        if username in self.data["users"]:
+            self.data["users"][username]["pwd"] = hash_password(new_pwd)
+            self.save()
+
     def get_audit_log(self, limit=100, user_filter="Todos", type_filter="Todos"):
         logs = self.data.get("audit_log", [])
         if user_filter != "Todos": logs = [l for l in logs if l.get("user") == user_filter]
@@ -122,7 +186,7 @@ class DataStore:
 db = DataStore()
 
 # =============================================
-# 3. FUNCIONES CLÍNICAS Y PREDICCIÓN [10-14]
+# MODELO CLÍNICO Y CÁLCULOS
 # =============================================
 def calcular_tfg_ckdepi(creatinina, edad, sexo="hombre", raza="no_afro"):
     k = 0.7 if sexo == "mujer" else 0.9
@@ -130,7 +194,8 @@ def calcular_tfg_ckdepi(creatinina, edad, sexo="hombre", raza="no_afro"):
     raza_factor = 1.159 if raza == "afro" else 1.0
     sexo_factor = 1.018 if sexo == "mujer" else 1.0
     min_k_cr, max_k_cr = min(creatinina / k, 1), max(creatinina / k, 1)
-    return round(141 * (min_k_cr ** alpha) * (max_k_cr ** -1.209) * (0.993 ** edad) * sexo_factor * raza_factor)
+    TFG = 141 * (min_k_cr ** alpha) * (max_k_cr ** -1.209) * (0.993 ** edad) * sexo_factor * raza_factor
+    return round(TFG)
 
 def clasificar_erc(tfg):
     if tfg >= 90: return "G1 (Normal o Alto)"
@@ -138,7 +203,7 @@ def clasificar_erc(tfg):
     elif tfg >= 45: return "G3a (Disminución Leve a Moderada)"
     elif tfg >= 30: return "G3b (Disminución Moderada a Severa)"
     elif tfg >= 15: return "G4 (Disminución Severa)"
-    return "G5 (Fallo Renal)"
+    else: return "G5 (Fallo Renal)"
 
 def predecir(row):
     sexo_tfg = "mujer" if row.get("sexo") == "Mujer" else "hombre"
@@ -146,99 +211,159 @@ def predecir(row):
     tfg = calcular_tfg_ckdepi(row["creatinina"], row["edad"], sexo_tfg, raza_tfg)
     estadio = clasificar_erc(tfg)
     base = 10 + (row["creatinina"] - 1) * 32 + max(0, row["glucosa_ayunas"] - 126) * 0.3
+    base += max(0, row["presion_sistolica"] - 140) * 0.2
     riesgo = round(max(1, min(99, base + np.random.uniform(-5, 8))), 1)
     return riesgo, tfg, estadio
 
 def riesgo_level(risk):
     if risk > 70: return "MUY ALTO", DANGER, "Intervención URGENTE - Referir a nefrología inmediatamente", "Grave"
     elif risk > 40: return "ALTO", WARNING, "Intervención Media - Control estricto y seguimiento mensual", "Intermedio"
-    return "MODERADO", SUCCESS, "Seguimiento Rutinario - Control cada 6 meses", "Normal"
+    else: return "MODERADO", SUCCESS, "Seguimiento Rutinario - Control cada 6 meses", "Normal"
+
+def get_doctor_recommendation(risk):
+    if risk > 70: return "REFERENCIA URGENTE a NEFRÓLOGO. Iniciar estudios complementarios de inmediato."
+    elif risk > 40: return "MONITOREO INTENSIVO. Evaluar ajuste de tratamiento con IECA/ARA-II."
+    return "SEGUIMIENTO DE RUTINA (cada 6-12 meses)."
 
 # =============================================
-# 4. INTERFAZ DE LOGIN [15-17]
+# REPORTE PDF Y GAUGE
 # =============================================
-if "logged_in" not in st.session_state: st.session_state.logged_in = False
+class PDFReport(FPDF):
+    def header(self):
+        self.set_fill_color(0, 102, 204)
+        self.rect(0, 0, 210, 20, 'F')
+        self.set_text_color(255, 255, 255)
+        self.set_font('Arial', 'B', 15)
+        self.cell(0, 10, 'NefroPredict RD - Reporte de Evaluación', 0, 1, 'C')
+    def chapter_title(self, title, color_hex):
+        r, g, b = tuple(int(color_hex.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+        self.set_text_color(r, g, b)
+        self.set_font('Arial', 'B', 14); self.cell(0, 10, title, 0, 1, 'L')
+    def chapter_body(self, body):
+        self.set_text_color(33, 37, 41); self.set_font('Arial', '', 12); self.multi_cell(0, 7, body)
+
+def crear_gauge_riesgo(riesgo):
+    color = DANGER if riesgo > 70 else (WARNING if riesgo > 40 else SUCCESS)
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number", value=riesgo,
+        number={'suffix': "%", 'font': {'color': color}},
+        gauge={'axis': {'range': }, 'bar': {'color': color},
+               'steps': [{'range': [3], 'color': hex_to_rgba(SUCCESS, 0.2)},
+                         {'range': [3], 'color': hex_to_rgba(WARNING, 0.2)},
+                         {'range': , 'color': hex_to_rgba(DANGER, 0.2)}]}
+    ))
+    fig.update_layout(height=350, margin=dict(l=20, r=20, t=60, b=20), paper_bgcolor='rgba(0,0,0,0)')
+    return fig
+
+# =============================================
+# LÓGICA DE INTERFAZ
+# =============================================
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
-    col1, col2, col3 = st.columns([2, 3])
+    # CORRECCIÓN DE ERROR: 3 variables para 3 columnas [1, 4]
+    col1, col2, col3 = st.columns([1, 4])
     with col2:
         st.markdown("### 🔐 Acceso Seguro")
         with st.form("login"):
-            username = st.text_input("Usuario").lower().strip()
-            password = st.text_input("Contraseña", type="password")
-            if st.form_submit_button("Iniciar Sesión", use_container_width=True):
-                user = db.verify_login(username, password)
-                if user:
-                    st.session_state.update({"logged_in": True, "username": username, "role": user["role"], "doctor_name": user["name"]})
+            u = st.text_input("Usuario").lower().strip()
+            p = st.text_input("Contraseña", type="password")
+            if st.form_submit_button("Entrar", use_container_width=True):
+                res = db.verify_login(u, p)
+                if res == "BLOCKED": st.error("Cuenta bloqueada por 5 min.")
+                elif res:
+                    st.session_state.update({"logged_in": True, "username": u, "role": res["role"], "doctor_name": res["name"]})
                     st.rerun()
                 else: st.error("❌ Credenciales incorrectas")
     st.stop()
 
-# =============================================
-# 5. MENÚ Y TABS (HABILITADO) [18-21]
-# =============================================
-menu = ["📋 Evaluación Individual", "📤 Carga Masiva", "📊 Historial"]
-if st.session_state.role == "admin": menu += ["📈 Estadísticas", "🔍 Auditoría"]
-tabs = st.tabs(menu)
+# Logout y Encabezado
+col_logout1, col_logout2 = st.columns([4, 5])
+with col_logout2:
+    if st.button("🚪 Salir"):
+        st.session_state.clear()
+        st.rerun()
 
-# --- TAB 1: EVALUACIÓN INDIVIDUAL ---
-with tabs:
-    col_f, col_r = st.columns([1.2, 1])
-    with col_f:
-        with st.form("eval"):
-            nombre = st.text_input("Nombre del Paciente")
-            c1, c2 = st.columns(2)
-            with c1:
-                sexo = st.selectbox("Sexo", ["Hombre", "Mujer"])
-                edad = st.number_input("Edad", 18, 120, 55)
-                creat = st.number_input("Creatinina (mg/dL)", 0.1, 15.0, 1.2)
-            with c2:
-                raza = st.selectbox("Raza", ["No-Afroamericano", "Afroamericano"])
-                glucosa = st.number_input("Glucosa (mg/dL)", 50, 500, 110)
-                presion = st.number_input("Sistólica (mmHg)", 80, 250, 130)
-            if st.form_submit_button("Analizar Riesgo"):
-                if nombre:
-                    riesgo, tfg, estadio = predecir({"edad": edad, "creatinina": creat, "sexo": sexo, "raza": raza, "glucosa_ayunas": glucosa, "presion_sistolica": presion})
-                    nivel, _, reco, _ = riesgo_level(riesgo)
-                    record = {"nombre_paciente": nombre, "edad": edad, "sexo": sexo, "creatinina": creat, "glucosa_ayunas": glucosa, "riesgo": riesgo, "nivel": nivel, "tfg": tfg, "estadio_erc": estadio, "doctor_name": st.session_state.doctor_name, "doctor_user": st.session_state.username, "timestamp": datetime.now().isoformat()}
-                    db.add_patient(record)
-                    st.session_state.ultimo = record
-                else: st.error("Nombre requerido")
-
-# --- TAB 3: HISTORIAL (CORRECCIÓN KEYERROR) [1] ---
-with tabs[3]:
-    st.markdown("## 📊 Historial de Evaluaciones")
-    patients = db.get_all_patients() if st.session_state.role == "admin" else db.get_patients_by_doctor(st.session_state.username)
-    if patients:
-        df_h = pd.DataFrame(patients)
-        # SOLUCIÓN DINÁMICA: Filtrar solo las columnas que existen en el DataFrame real
-        cols_deseadas = ['timestamp', 'nombre_paciente', 'edad', 'creatinina', 'riesgo', 'nivel', 'tfg', 'estadio_erc', 'doctor_name']
-        cols_presentes = [c for c in cols_deseadas if c in df_h.columns]
-        st.dataframe(df_h[cols_presentes].sort_values(by='timestamp', ascending=False), use_container_width=True)
-    else: st.info("No hay registros.")
-
-# --- TAB 5: ESTADÍSTICAS (HABILITADO) [22-24] ---
+# Tabs según Rol
+tabs_labels = ["📋 Evaluación", "📤 Carga Masiva", "📊 Historial"]
 if st.session_state.role == "admin":
-    with tabs[4]:
-        st.markdown("## 📈 Estadísticas Globales")
-        data_s = db.get_all_patients()
-        if data_s:
-            df_s = pd.DataFrame(data_s)
-            c_m = st.columns(3)
-            c_m.metric("Total Pacientes", len(df_s))
-            if 'riesgo' in df_s: c_m[2].metric("Riesgo Promedio", f"{df_s['riesgo'].mean():.1f}%")
-            if 'tfg' in df_s: c_m[3].metric("TFG Promedio", f"{df_s['tfg'].mean():.1f}")
-            st.plotly_chart(px.pie(df_s, names='nivel', title="Distribución de Riesgo"), use_container_width=True)
-        else: st.info("Sin datos para estadísticas.")
+    tabs_labels += ["👥 Usuarios", "📈 Estadísticas", "🔍 Auditoría"]
 
-# --- TAB 6: AUDITORÍA (HABILITADO) [21, 25] ---
-    with tabs[5]:
-        st.markdown("## 🔍 Registro de Seguridad")
-        logs = db.get_audit_log(limit=200)
-        if logs: st.dataframe(pd.DataFrame(logs), use_container_width=True)
-        else: st.info("Sin logs de auditoría.")
+tabs = st.tabs(tabs_labels)
 
-# Logout [26]
-if st.sidebar.button("🚪 Cerrar Sesión"):
-    st.session_state.clear()
-    st.rerun()
+# --- TAB EVALUACIÓN ---
+with tabs:
+    c_form, c_res = st.columns([1.2, 1])
+    with c_form:
+        with st.form("f_eval"):
+            nom = st.text_input("Nombre del Paciente")
+            ca, cb = st.columns(2)
+            with ca:
+                sex = st.selectbox("Sexo", ["Hombre", "Mujer"])
+                ed = st.number_input("Edad", 18, 120, 55)
+                creat = st.number_input("Creatinina", 0.1, 15.0, 1.1)
+            with cb:
+                raz = st.selectbox("Raza", ["No-Afroamericano", "Afroamericano"])
+                gluc = st.number_input("Glucosa", 50, 500, 100)
+                pres = st.number_input("Sistólica", 80, 250, 120)
+            if st.form_submit_button("Analizar"):
+                if nom:
+                    r, tf, es = predecir({"edad": ed, "creatinina": creat, "sexo": sex, "raza": raz, "glucosa_ayunas": gluc, "presion_sistolica": pres})
+                    rec_p = get_doctor_recommendation(r)
+                    rec = {"nombre_paciente": nom, "riesgo": r, "tfg": tf, "estadio_erc": es, "doctor_user": st.session_state.username, 
+                           "timestamp": datetime.now().isoformat(), "reco_privada": rec_p, "doctor_name": st.session_state.doctor_name,
+                           "edad": ed, "creatinina": creat, "glucosa_ayunas": gluc, "presion_sistolica": pres, "imc": 25.0}
+                    db.add_patient(rec)
+                    st.session_state.ultimo = rec
+                else: st.error("Falta nombre")
+    
+    if "ultimo" in st.session_state:
+        with c_res:
+            p = st.session_state.ultimo
+            st.plotly_chart(crear_gauge_riesgo(p["riesgo"]), use_container_width=True)
+            nivel, _, _, _ = riesgo_level(p["riesgo"])
+            st.markdown(f"**Resultado:** {nivel} ({p['riesgo']}%)\n\n**TFG:** {p['tfg']} | **Estadio:** {p['estadio_erc']}")
+            st.warning(f"**Sugerencia:** {p['reco_privada']}")
+
+# --- TAB CARGA MASIVA ---
+with tabs[4]:
+    file = st.file_uploader("Subir CSV", type="csv")
+    if file and st.button("Procesar"):
+        df = pd.read_csv(file)
+        for _, row in df.iterrows():
+            d = {"edad": row['edad'], "creatinina": row['creatinina'], "sexo": row['sexo'], "raza": row['raza'], "glucosa_ayunas": row['glucosa_ayunas'], "presion_sistolica": row['presion_sistolica']}
+            r, tf, es = predecir(d)
+            db.add_patient({**d, "nombre_paciente": row['nombre_paciente'], "riesgo": r, "tfg": tf, "estadio_erc": es, "doctor_user": st.session_state.username, "timestamp": datetime.now().isoformat()})
+        st.success("Completado")
+
+# --- TAB HISTORIAL ---
+with tabs[1]:
+    pats = db.get_all_patients() if st.session_state.role == "admin" else db.get_patients_by_doctor(st.session_state.username)
+    if pats:
+        df_h = pd.DataFrame(pats)
+        # CORRECCIÓN DE KEYERROR: Solo mostramos columnas si existen
+        cols = ['timestamp', 'nombre_paciente', 'riesgo', 'tfg', 'estadio_erc']
+        if st.session_state.role == "admin": cols.insert(2, 'doctor_name')
+        st.dataframe(df_h[[c for c in cols if c in df_h.columns]].sort_values(by='timestamp', ascending=False))
+
+# --- TABS EXCLUSIVAS ADMIN ---
+if st.session_state.role == "admin":
+    with tabs[2]: # Usuarios
+        with st.form("new_u"):
+            u_id, u_nom, u_pwd = st.text_input("ID"), st.text_input("Nombre"), st.text_input("Pass", type="password")
+            if st.form_submit_button("Crear"):
+                db.create_doctor(u_id, u_pwd, u_nom)
+                st.rerun()
+    with tabs[6]: # Estadísticas (HABILITADO)
+        data_all = db.get_all_patients()
+        if data_all:
+            df_s = pd.DataFrame(data_all)
+            c1, c2 = st.columns(2)
+            with c1: st.plotly_chart(px.pie(df_s, names='estadio_erc', title="Distribución por Estadio"))
+            with c2: 
+                if 'riesgo' in df_s: st.metric("Riesgo Promedio", f"{df_s['riesgo'].mean():.1f}%")
+    with tabs[7]: # Auditoría (HABILITADO)
+        st.dataframe(pd.DataFrame(db.get_audit_log()))
+
+st.markdown("<hr><center>© 2024 NefroPredict RD</center>", unsafe_allow_html=True)
