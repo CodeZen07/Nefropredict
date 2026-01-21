@@ -4,7 +4,7 @@ import bcrypt
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
+from datetime import datetime
 from fpdf import FPDF
 import io
 
@@ -78,7 +78,6 @@ def crear_pdf(datos, recoms, medico):
 
     pdf.set_font("Arial", 'B', 12)
     pdf.cell(200, 10, "RECOMENDACIONES:", ln=True)
-    pdf.set_font("Arial", '', 10)
     for cat, items in recoms.items():
         if items:
             pdf.set_font("Arial", 'B', 10)
@@ -111,13 +110,13 @@ if not st.session_state.auth:
                 st.session_state.update({"auth":True, "name":res[1], "role":res[2], "username":u})
                 db.log_action(u, "Login", "Acceso exitoso")
                 st.rerun()
+            else:
+                st.error("Credenciales incorrectas")
     st.stop()
 
-# Menú lateral
 st.sidebar.title(f"Dr. {st.session_state.name}")
 menu = st.sidebar.radio("Menú", ["Nueva Consulta", "Historial", "Panel Admin"])
 
-# --- SECCIÓN: NUEVA CONSULTA ---
 if menu == "Nueva Consulta":
     st.header("🔬 Evaluación Cardiorrenal")
     
@@ -125,48 +124,45 @@ if menu == "Nueva Consulta":
         c1, c2, c3 = st.columns(3)
         px_name = c1.text_input("Nombre Paciente")
         px_id = c2.text_input("ID")
-        sys_p = c3.number_input("Presión Sistólica", 80, 200, 120)
+        sys_p = c3.number_input("Presión Sistólica", 80, 220, 120)
         
         n1, n2, n3 = st.columns(3)
-        tfg = n1.number_input("TFG (ml/min)", 0, 150, 90)
-        pot = n2.number_input("Potasio (K+)", 2.0, 8.0, 4.0)
-        fevi = n3.number_input("FEVI (%)", 5, 80, 55)
+        tfg_in = n1.number_input("TFG (ml/min)", 0, 150, 90)
+        pot_in = n2.number_input("Potasio (K+)", 2.0, 8.0, 4.0)
+        fevi_in = n3.number_input("FEVI (%)", 5, 80, 55)
         
-        sleep = st.slider("Horas Sueño", 3.0, 12.0, 7.0)
-        stress = st.selectbox("Estrés", ["Bajo", "Moderado", "Alto"])
-        obs = st.text_area("Observaciones")
+        sleep_in = st.slider("Horas Sueño", 3.0, 12.0, 7.0)
+        stress_in = st.selectbox("Estrés", ["Bajo", "Moderado", "Alto"])
+        obs_in = st.text_area("Observaciones")
         
         btn_analizar = st.form_submit_button("GENERAR VEREDICTO")
 
     if btn_analizar:
-        # Guardar en session_state para persistencia
         st.session_state.datos_actuales = {
             "px_name": px_name, "px_id": px_id, "sys": sys_p, 
-            "tfg": tfg, "potasio": pot, "fevi": fevi, 
-            "sleep": sleep, "stress": stress, "obs": obs
+            "tfg": tfg_in, "potasio": pot_in, "fevi": fevi_in, 
+            "sleep": sleep_in, "stress": stress_in, "obs": obs_in
         }
         st.session_state.recoms_actuales = generar_plan_cientifico(st.session_state.datos_actuales)
         st.session_state.analisis_listo = True
         
-        # Guardar en DB
         db.conn.execute("INSERT INTO clinical_records (px_name, px_id, date, doctor, sys, tfg, potasio, fevi, sleep, stress, obs) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                        (px_name, px_id, datetime.now().strftime("%Y-%m-%d"), st.session_state.name, sys_p, tfg, pot, fevi, sleep, stress, obs))
+                        (px_name, px_id, datetime.now().strftime("%Y-%m-%d"), st.session_state.name, sys_p, tfg_in, pot_in, fevi_in, sleep_in, stress_in, obs_in))
         db.log_action(st.session_state.username, "Consulta", f"Paciente {px_name} analizado")
 
-    # Mostrar resultados fuera del form para evitar errores de renderizado
     if st.session_state.analisis_listo:
         st.divider()
         d = st.session_state.datos_actuales
         r = st.session_state.recoms_actuales
         
         st.subheader("📊 Trayectoria de Salud (Predicción 6 meses)")
-        # Gráfico de predicción basado en método científico (estabilización de TFG)
         fechas = ["Hoy", "+2 meses", "+4 meses", "+6 meses (Control)"]
         progreso = [d['tfg'], d['tfg']*1.02, d['tfg']*1.04, d['tfg']*1.05]
-        fig = px.area(x=fechas, y=progreso, title="Evolución Probable del Filtrado Glomerular con Tratamiento", labels={'x': 'Tiempo', 'y': 'TFG'})
+        fig = px.area(x=fechas, y=progreso, title="Evolución Probable del Filtrado Glomerular", labels={'x': 'Tiempo', 'y': 'TFG'})
         st.plotly_chart(fig, use_container_width=True)
-        
-        
+
+        # Guía visual de estadios renales para interpretación médica
+        # 
 
 [Image of chronic kidney disease stages chart]
 
@@ -175,33 +171,26 @@ if menu == "Nueva Consulta":
         col_pdf, col_rec = st.columns([1, 2])
         
         with col_pdf:
-            st.info("### Descargar Reporte")
             pdf_data = crear_pdf(d, r, st.session_state.name)
-            st.download_button(label="📄 Descargar PDF para Paciente", data=pdf_data, file_name=f"Reporte_{d['px_id']}.pdf", mime="application/pdf")
+            st.download_button(label="📄 Descargar PDF", data=pdf_data, file_name=f"Reporte_{d['px_id']}.pdf", mime="application/pdf")
 
         with col_rec:
-            st.info("### Recomendaciones Personalizadas")
             for cat, items in r.items():
                 if items: st.markdown(f"**{cat.capitalize()}:** {', '.join(items)}")
 
-# --- SECCIÓN: PANEL ADMIN ---
 elif menu == "Panel Admin":
     if st.session_state.role != "admin":
         st.error("Acceso denegado.")
     else:
-        st.header("🛡️ Panel de Auditoría y Gestión")
-        tab1, tab2 = st.tabs(["Auditoría de Acciones", "Gestión de Usuarios"])
-        
+        st.header("🛡️ Panel de Auditoría")
+        # 
+        tab1, tab2 = st.tabs(["Logs", "Usuarios"])
         with tab1:
             logs = pd.read_sql("SELECT * FROM audit_logs ORDER BY id DESC", db.conn)
             st.dataframe(logs, use_container_width=True)
-            
         with tab2:
-            st.subheader("Crear Nuevo Usuario")
             with st.form("new_u"):
-                nu = st.text_input("Usuario")
-                nn = st.text_input("Nombre")
-                np = st.text_input("Clave", type="password")
+                nu = st.text_input("Usuario"); nn = st.text_input("Nombre"); np = st.text_input("Clave", type="password")
                 nr = st.selectbox("Rol", ["medico", "admin"])
                 if st.form_submit_button("Registrar"):
                     hp = bcrypt.hashpw(np.encode(), bcrypt.gensalt()).decode()
@@ -209,17 +198,14 @@ elif menu == "Panel Admin":
                     db.conn.commit()
                     st.success("Usuario creado")
 
-# --- SECCIÓN: HISTORIAL ---
 elif menu == "Historial":
     st.header("📂 Historial Clínico")
-    h_px = st.text_input("Buscar por nombre del paciente")
+    h_px = st.text_input("Buscar paciente")
     if h_px:
         df = pd.read_sql(f"SELECT * FROM clinical_records WHERE px_name LIKE '%{h_px}%'", db.conn)
         if not df.empty:
             st.dataframe(df)
-            fig_evol = px.line(df, x="date", y=["tfg", "fevi"], title="Evolución Histórica de Parámetros")
-            st.plotly_chart(fig_evol)
+            st.plotly_chart(px.line(df, x="date", y=["tfg", "fevi"], title="Evolución Histórica"))
 
-# AVISO LEGAL PERMANENTE
 st.markdown("---")
-st.warning("⚠️ **AVISO LEGAL:** Esta plataforma es una herramienta de soporte clínico basada en guías KDIGO y AHA. No sustituye el veredicto de un profesional colegiado. Los datos de predicción son estimaciones estadísticas.")
+st.warning("⚠️ **AVISO LEGAL:** Esta plataforma es una herramienta de soporte clínico. No sustituye el veredicto de un profesional. Los datos son estimaciones basadas en guías KDIGO/AHA.")
