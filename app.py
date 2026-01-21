@@ -5,216 +5,272 @@ import bcrypt
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
+from datetime import datetime
 from fpdf import FPDF
 from io import BytesIO
 
 # =============================================
-# 1. CONFIGURACIÓN Y SEGURIDAD LEGAL
+# 1. CONFIGURACIÓN Y MARCO LEGAL
 # =============================================
-st.set_page_config(page_title="NefroCardio RD Pro", page_icon="⚖️", layout="wide")
+st.set_page_config(page_title="NefroCardio SaaS RD", page_icon="🏥", layout="wide")
 
-DISCLAIMER = """AVISO LEGAL: Esta herramienta es estrictamente de apoyo a la decision clinica y no sustituye el juicio profesional. 
-Los resultados son estimaciones probabilisticas basadas en modelos matematicos. El uso de esta informacion es responsabilidad exclusiva del medico tratante."""
+LEGAL_NOTICE = """⚠️ AVISO LEGAL: Esta plataforma es una herramienta de apoyo clinico para profesionales de la salud. 
+No reemplaza el juicio medico ni la evaluacion presencial. Los datos generados son proyecciones 
+basadas en literatura cientifica (KDIGO/AHA). El uso de la informacion es responsabilidad del medico."""
 
 # =============================================
-# 2. BASE DE DATOS EVOLUCIONADA
+# 2. MOTOR DE BASE DE DATOS
 # =============================================
-class SystemDB:
+class AppDatabase:
     def __init__(self):
-        self.conn = sqlite3.connect("clinica_saas.db", check_same_thread=False)
-        self.init_tables()
+        self.conn = sqlite3.connect("nefrocardio_saas.db", check_same_thread=False)
+        self.init_db()
 
-    def init_tables(self):
-        c = self.conn.cursor()
-        # Usuarios con especialidad
-        c.execute("""CREATE TABLE IF NOT EXISTS users (
+    def init_db(self):
+        cursor = self.conn.cursor()
+        # Usuarios (Suscripciones)
+        cursor.execute("""CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY, password TEXT, name TEXT, 
             role TEXT, specialty TEXT, active INT)""")
-        # Pacientes con datos clinicos extendidos
-        c.execute("""CREATE TABLE IF NOT EXISTS records (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, patient_id TEXT, name TEXT, doctor TEXT,
-            specialty TEXT, weight REAL, height REAL, systolic INT, glucose REAL, 
-            creat REAL, tfg REAL, cv_risk REAL, date TEXT)""")
+        # Registros de Consultas
+        cursor.execute("""CREATE TABLE IF NOT EXISTS records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, px_id TEXT, px_name TEXT, 
+            doctor TEXT, spec TEXT, weight REAL, height REAL, sys INT, 
+            gluc REAL, creat REAL, tfg REAL, risk REAL, date TEXT)""")
         
-        c.execute("SELECT * FROM users WHERE username='admin'")
-        if not c.fetchone():
-            pw = bcrypt.hashpw("Admin2026!".encode(), bcrypt.gensalt()).decode()
-            c.execute("INSERT INTO users VALUES (?,?,?,?,?,?)", ("admin", pw, "Admin Sistema", "admin", "all", 1))
+        # Crear Admin Maestro
+        cursor.execute("SELECT * FROM users WHERE username='admin'")
+        if not cursor.fetchone():
+            hashed = bcrypt.hashpw("Admin2026!".encode(), bcrypt.gensalt()).decode()
+            cursor.execute("INSERT INTO users VALUES (?,?,?,?,?,?)", 
+                          ("admin", hashed, "Administrador SaaS", "admin", "todas", 1))
         self.conn.commit()
 
-db = SystemDB()
+    def create_user(self, u, p, n, r, s):
+        try:
+            hp = bcrypt.hashpw(p.encode(), bcrypt.gensalt()).decode()
+            self.conn.execute("INSERT INTO users VALUES (?,?,?,?,?,?)", (u, hp, n, r, s, 1))
+            self.conn.commit()
+            return True
+        except: return False
+
+db = AppDatabase()
 
 # =============================================
-# 3. MOTOR DE RECOMENDACIONES CIENTÍFICAS
+# 3. LÓGICA CIENTÍFICA: PROYECCIONES Y PLANES
 # =============================================
-def get_personalized_plan(data):
-    imc = data['weight'] / ((data['height']/100)**2)
-    plan = {"dieta": "", "estilo": "", "proyeccion": ""}
+def calcular_proyeccion_salud(w, h, sys, gluc):
+    imc = round(w / ((h/100)**2), 1)
+    plan = {
+        "nutricion": "",
+        "estilo_vida": "Ejercicio aerobico 150 min/semana. Higiene del sueno (7-8h). Manejo de estres mediante pausas activas.",
+        "proyeccion": ""
+    }
     
-    # Lógica de Dieta y Peso
+    # Lógica de peso
     if imc > 25:
-        deficit = 500 # kcal/dia
-        semanas = round((data['weight'] * 0.10) / 0.5) # tiempo para bajar 10% del peso
-        plan["dieta"] = f"Dieta Hipocalorica Mediterranea. Restriccion de 500kcal/dia. Priorizar proteinas magras y fibra."
-        plan["proyeccion"] = f"Siguiendo el plan, proyectamos una perdida de {round(data['weight']*0.1, 1)} lbs en {semanas} semanas."
+        perder_kg = round(w * 0.10, 1)
+        semanas = int(perder_kg / 0.5) # 0.5kg por semana es saludable
+        plan["nutricion"] = "Restriccion calorica moderada (-500 kcal/dia). Enfoque en dieta DASH (baja en sodio)."
+        plan["proyeccion"] = f"Meta: Reducir {perder_kg} kg ({round(perder_kg*2.204, 1)} lbs) en {semanas} semanas."
     else:
-        plan["dieta"] = "Dieta Normocalorica Dash para mantenimiento de salud endotelial."
-        plan["proyeccion"] = "Mantenimiento de estabilidad metabolica en 12 semanas."
+        plan["nutricion"] = "Dieta normocalorica equilibrada. Priorizar grasas insaturadas y carbohidratos complejos."
+        plan["proyeccion"] = "Mantenimiento de parametros actuales y estabilidad endotelial."
 
-    # Gestión de Estrés y Sueño
-    if data['systolic'] > 140 or data['glucose'] > 110:
-        plan["estilo"] = "Higiene del sueño: 7-8h diarias. Protocolo de respiracion guiada 10 min/noche. Ejercicio aerobico 30m/dia."
-    else:
-        plan["estilo"] = "Mantener actividad fisica actual. Incorporar entrenamiento de fuerza 2 veces por semana."
-        
-    return plan, round(imc, 1)
+    return plan, imc
 
 # =============================================
-# 4. GENERADOR DE REPORTES PDF
+# 4. GENERADOR DE REPORTES (SOLUCIÓN BYTESIO)
 # =============================================
-def generate_medical_pdf(p_data, doc_info):
+def export_medical_report(p_data, doc_name, spec):
     pdf = FPDF()
     pdf.add_page()
     
-    # Header
-    pdf.set_fill_color(41, 128, 185)
-    pdf.rect(0, 0, 210, 45, 'F')
-    pdf.set_font("Arial", 'B', 20)
+    # Cabecera Profesional
+    pdf.set_fill_color(0, 102, 204)
+    pdf.rect(0, 0, 210, 40, 'F')
+    pdf.set_font("Arial", 'B', 16)
     pdf.set_text_color(255, 255, 255)
-    pdf.cell(0, 15, "INFORME MEDICO PERSONALIZADO", 0, 1, 'C')
-    pdf.set_font("Arial", 'I', 8)
-    pdf.multi_cell(0, 5, DISCLAIMER)
+    pdf.cell(0, 15, "INFORME MEDICO Y RECOMENDACIONES", 0, 1, 'C')
+    pdf.set_font("Arial", 'I', 7)
+    pdf.multi_cell(0, 4, LEGAL_NOTICE)
     
-    # Paciente
+    # Info Paciente
     pdf.ln(10)
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Arial", 'B', 12)
-    pdf.cell(0, 10, f"Paciente: {p_data['name']} | Dr. {doc_info['name']} ({doc_info['spec']})", 0, 1)
+    pdf.cell(0, 10, f"Paciente: {p_data['name'].upper()} | ID: {p_data['id']}", 0, 1)
+    pdf.cell(0, 10, f"Medico Tratante: {doc_name} ({spec.capitalize()})", 0, 1)
     pdf.line(10, 65, 200, 65)
     
     # Resultados
     pdf.ln(5)
-    pdf.set_fill_color(240, 240, 240)
-    pdf.cell(90, 10, "Indicador", 1, 0, 'C', True)
-    pdf.cell(90, 10, "Valor Actual", 1, 1, 'C', True)
-    
+    pdf.set_font("Arial", 'B', 11)
+    pdf.cell(0, 10, "RESULTADOS CLINICOS:", 0, 1)
+    pdf.set_font("Arial", '', 10)
     for k, v in p_data['metrics'].items():
-        pdf.cell(90, 8, k, 1)
-        pdf.cell(90, 8, str(v), 1, 1)
-
-    # Plan
+        pdf.cell(90, 8, f"{k}:", 1)
+        pdf.cell(90, 8, f"{v}", 1, 1)
+        
+    # Recomendaciones
     pdf.ln(10)
-    pdf.set_font("Arial", 'B', 14)
-    pdf.set_text_color(41, 128, 185)
-    pdf.cell(0, 10, "PLAN DE VIDA Y NUTRICION", 0, 1)
-    pdf.set_font("Arial", '', 11)
+    pdf.set_font("Arial", 'B', 12)
+    pdf.set_text_color(0, 102, 204)
+    pdf.cell(0, 10, "PLAN DE SEGUIMIENTO PERSONALIZADO:", 0, 1)
     pdf.set_text_color(0, 0, 0)
-    pdf.multi_cell(0, 7, f"DIETA: {p_data['plan']['dieta']}\n\nESTILO DE VIDA: {p_data['plan']['estilo']}\n\nPROYECCION: {p_data['plan']['proyeccion']}")
+    pdf.set_font("Arial", '', 10)
     
-    out = pdf.output(dest='S')
-    return BytesIO(out.encode('latin-1', errors='replace')) if isinstance(out, str) else BytesIO(out)
+    recoms = [
+        ("NUTRICION", p_data['plan']['nutricion']),
+        ("ESTILO DE VIDA", p_data['plan']['estilo_vida']),
+        ("PROYECCION DE MEJORA", p_data['plan']['proyeccion'])
+    ]
+    
+    for tit, cont in recoms:
+        pdf.set_font("Arial", 'B', 10)
+        pdf.cell(0, 7, f"{tit}:", 0, 1)
+        pdf.set_font("Arial", '', 10)
+        # Limpieza de caracteres latinos para FPDF
+        txt = cont.replace('ñ','n').replace('á','a').replace('é','e').replace('í','i').replace('ó','o').replace('ú','u')
+        pdf.multi_cell(0, 6, txt)
+        pdf.ln(2)
+
+    # Firma
+    pdf.ln(20)
+    pdf.line(70, pdf.get_y(), 140, pdf.get_y())
+    pdf.cell(0, 10, f"Firma Dr. {doc_name}", 0, 1, 'C')
+
+    # Retorno de bytes
+    res = pdf.output(dest='S')
+    if isinstance(res, str):
+        return BytesIO(res.encode('latin-1', errors='replace'))
+    return BytesIO(res)
 
 # =============================================
-# 5. INTERFAZ DE USUARIO
+# 5. INTERFAZ Y NAVEGACIÓN
 # =============================================
 if "auth" not in st.session_state:
     st.session_state.auth = False
 
+# --- PANTALLA DE LOGIN ---
 if not st.session_state.auth:
-    c1, c2, c3 = st.columns([1,1.5,1])
-    with col2 := c2:
-        st.title("🏥 NefroCardio SaaS")
-        u = st.text_input("Usuario")
-        p = st.text_input("Clave", type="password")
-        if st.button("Acceder"):
+    col1, col2, col3 = st.columns([1, 1.5, 1])
+    with col2:
+        st.markdown("<h2 style='text-align: center;'>🔐 Acceso Suscriptores</h2>", unsafe_allow_html=True)
+        user = st.text_input("Usuario")
+        password = st.text_input("Contraseña", type="password")
+        if st.button("Iniciar Sesión", use_container_width=True):
             cursor = db.conn.cursor()
-            cursor.execute("SELECT password, name, role, specialty FROM users WHERE username=?", (u,))
-            res = cursor.fetchone()
-            if res and bcrypt.checkpw(p.encode(), res[0].encode()):
-                st.session_state.update({"auth":True, "user":u, "name":res[1], "role":res[2], "spec":res[3]})
+            cursor.execute("SELECT password, name, role, specialty FROM users WHERE username=?", (user,))
+            data = cursor.fetchone()
+            if data and bcrypt.checkpw(password.encode(), data[0].encode()):
+                st.session_state.update({"auth":True, "user":user, "name":data[1], "role":data[2], "spec":data[3]})
                 st.rerun()
-        st.info(f"⚖️ {DISCLAIMER}")
+            else: st.error("Credenciales invalidas")
+        st.caption(LEGAL_NOTICE)
     st.stop()
 
-# --- SIDEBAR ---
+# --- SIDEBAR NAVEGACIÓN ---
 with st.sidebar:
-    st.write(f"🩺 **{st.session_state.name}**")
-    st.write(f"Especialidad: {st.session_state.spec.upper()}")
-    menu = st.radio("Acciones", ["Nueva Consulta", "Historial Pacientes", "Admin Panel"])
-    if st.button("Salir"):
+    st.markdown(f"### Dr. {st.session_state.name}")
+    st.write(f"💼 Especialidad: {st.session_state.spec.upper()}")
+    st.markdown("---")
+    menu = st.radio("MODULOS", ["📊 Nueva Consulta", "📈 Historial & Evolucion", "⚙️ Panel Administrativo"])
+    if st.button("Cerrar Sesión"):
         st.session_state.auth = False
         st.rerun()
 
-# --- MODULO: NUEVA CONSULTA ---
-if menu == "Nueva Consulta":
-    st.header(f"Evaluacion Especializada: {st.session_state.spec}")
+# =============================================
+# 6. LÓGICA DE MÓDULOS
+# =============================================
+
+# --- MÓDULO CONSULTA ---
+if menu == "📊 Nueva Consulta":
+    st.header(f"Calculadora Medica Especializada: {st.session_state.spec.capitalize()}")
     
-    with st.form("main_form"):
+    with st.form("form_px"):
         c1, c2 = st.columns(2)
-        p_id = c1.text_input("Cedula/ID Paciente")
-        p_name = c2.text_input("Nombre Completo")
+        px_id = c1.text_input("ID Paciente (Cedula/Pasaporte)")
+        px_name = c2.text_input("Nombre Completo")
         
-        col1, col2, col3 = st.columns(3)
-        w = col1.number_input("Peso (kg)", 40.0, 200.0, 75.0)
-        h = col2.number_input("Altura (cm)", 100, 220, 170)
-        syst = col3.number_input("Presion Sistolica", 80, 220, 120)
+        m1, m2, m3 = st.columns(3)
+        weight = m1.number_input("Peso (kg)", 35.0, 250.0, 75.0)
+        height = m2.number_input("Talla (cm)", 110, 220, 170)
+        sys_p = m3.number_input("Presion Sistolica", 80, 220, 120)
         
-        # Inputs Dinamicos por Especialidad
+        # Filtros por especialidad
         tfg, cv_risk = 0, 0
-        if st.session_state.spec in ["nefrologia", "all"]:
-            creat = st.number_input("Creatinina (mg/dL)", 0.5, 10.0, 1.0)
-            tfg = round(141 * min(creat/0.9, 1)**-0.411 * 0.993**30, 1) # Simplificado
+        if st.session_state.spec in ["nefrologia", "todas"]:
+            st.markdown("**Seccion Nefrologia**")
+            creat = st.number_input("Creatinina Serica (mg/dL)", 0.4, 15.0, 1.0)
+            # CKD-EPI Simplificada
+            tfg = round(141 * min(creat/0.9, 1)**-0.411 * 0.993**40, 1)
         
-        if st.session_state.spec in ["cardiologia", "all"]:
-            gluc = st.number_input("Glucosa (mg/dL)", 60, 300, 100)
-            cv_risk = round((syst * 0.1) + (gluc * 0.05), 1)
-
-        if st.form_submit_button("Generar Analisis y Proyeccion"):
-            # Procesar
-            plan, imc = get_personalized_plan({'weight':w, 'height':h, 'systolic':syst, 'glucose':100})
+        if st.session_state.spec in ["cardiologia", "todas"]:
+            st.markdown("**Seccion Cardiologia**")
+            gluc = st.number_input("Glucosa (mg/dL)", 60, 400, 105)
+            cv_risk = round((sys_p * 0.1) + (gluc * 0.04), 1) # Indice de riesgo educativo
             
-            # Guardar
-            db.conn.execute("INSERT INTO records (patient_id, name, doctor, specialty, weight, height, systolic, glucose, creat, tfg, cv_risk, date) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                           (p_id, p_name, st.session_state.name, st.session_state.spec, w, h, syst, 100, 1.0, tfg, cv_risk, datetime.now().strftime('%Y-%m-%d')))
-            db.conn.commit()
+        btn_calc = st.form_submit_button("ANALIZAR Y GENERAR PLAN")
 
-            # UI Resultados
-            st.success("Analisis Completado")
-            res_c1, res_c2 = st.columns(2)
-            res_c1.metric("IMC", imc)
-            res_c1.write(f"**Dieta:** {plan['dieta']}")
-            res_c2.metric("Proyeccion", "Exito Estimado")
-            res_c2.write(f"**Meta:** {plan['proyeccion']}")
-            
-            # PDF
-            metrics = {"IMC": imc, "Presion": syst, "TFG": tfg, "Riesgo CV": cv_risk}
-            pdf_data = {"name": p_name, "metrics": metrics, "plan": plan}
-            pdf_buf = generate_medical_pdf(pdf_data, {"name": st.session_state.name, "spec": st.session_state.spec})
-            st.download_button("Descargar Reporte y Plan", pdf_buf.getvalue(), f"Plan_{p_name}.pdf", "application/pdf")
+    if btn_calc:
+        plan, imc = calcular_proyeccion_salud(weight, height, sys_p, 100)
+        
+        # Guardar en DB
+        db.conn.execute("""INSERT INTO records 
+            (px_id, px_name, doctor, spec, weight, height, sys, gluc, creat, tfg, risk, date) 
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (px_id, px_name, st.session_state.name, st.session_state.spec, weight, height, sys_p, 100, 1.0, tfg, cv_risk, datetime.now().strftime('%Y-%m-%d')))
+        db.conn.commit()
+        
+        st.success("Analisis Clinico Finalizado")
+        
+        # UI de Resultados
+        res1, res2 = st.columns(2)
+        res1.metric("IMC Actual", imc)
+        res2.write(f"**Proyeccion de Mejora:** {plan['proyeccion']}")
+        
+        # Generar PDF
+        metrics = {"IMC": imc, "Presion": sys_p, "TFG": tfg, "Riesgo CV": cv_risk}
+        p_data = {"id": px_id, "name": px_name, "metrics": metrics, "plan": plan}
+        pdf_buf = export_medical_report(p_data, st.session_state.name, st.session_state.spec)
+        
+        st.download_button(
+            label="📥 DESCARGAR PLAN PARA PACIENTE",
+            data=pdf_buf.getvalue(),
+            file_name=f"Plan_{px_name}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
 
-# --- MODULO: HISTORIAL ---
-elif menu == "Historial Pacientes":
-    st.header("Seguimiento de Evolucion")
-    p_id_search = st.text_input("Ingrese ID del Paciente para ver progreso")
-    if p_id_search:
-        df = pd.read_sql(f"SELECT * FROM records WHERE patient_id='{p_id_search}'", db.conn)
+# --- MÓDULO HISTORIAL ---
+elif menu == "📈 Historial & Evolucion":
+    st.header("Seguimiento de Evolucion Clinica")
+    search_id = st.text_input("Buscar ID de Paciente")
+    
+    if search_id:
+        df = pd.read_sql(f"SELECT * FROM records WHERE px_id='{search_id}'", db.conn)
         if not df.empty:
-            fig = px.line(df, x="date", y=["weight", "tfg", "cv_risk"], title="Evolucion Clinica")
-            st.plotly_chart(fig)
-            st.dataframe(df)
+            st.write(f"Historial de {df['px_name'].iloc[0]}")
+            # Gráfico de mejora
+            fig = px.line(df, x="date", y=["weight", "tfg"], title="Evolucion de Peso y Funcion Renal", markers=True)
+            st.plotly_chart(fig, use_container_width=True)
+            st.dataframe(df, use_container_width=True)
+        else:
+            st.warning("No se encontraron registros.")
 
-# --- MODULO: ADMIN ---
-elif menu == "Admin Panel":
+# --- MÓDULO ADMIN ---
+elif menu == "⚙️ Panel Administrativo":
     if st.session_state.role != "admin":
-        st.error("No tienes permisos")
+        st.error("Acceso restringido al Administrador del SaaS.")
     else:
-        st.subheader("Gestion de Suscriptores (Medicos)")
+        st.header("Gestion de Suscripciones Medicas")
         with st.form("new_doc"):
-            new_u = st.text_input("ID Login")
-            new_p = st.text_input("Clave")
-            new_n = st.text_input("Nombre Dr.")
-            new_s = st.selectbox("Especialidad", ["nefrologia", "cardiologia", "all"])
-            if st.form_submit_button("Crear Suscriptor"):
-                db.add_user(new_u, new_p, new_n, "doctor", new_s)
-                st.success("Medico añadido con acceso especializado")
+            st.write("Registrar Nuevo Medico")
+            nu, np = st.text_input("Usuario (Login)"), st.text_input("Password", type="password")
+            nn = st.text_input("Nombre Completo")
+            ns = st.selectbox("Especialidad Permitida", ["nefrologia", "cardiologia", "todas"])
+            if st.form_submit_button("Activar Suscripcion"):
+                if db.create_user(nu, np, nn, "doctor", ns):
+                    st.success("Médico activado correctamente.")
+                else: st.error("El usuario ya existe.")
