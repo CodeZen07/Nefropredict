@@ -161,12 +161,6 @@ if menu == "Nueva Consulta":
         fig = px.area(x=fechas, y=progreso, title="Evolución Probable del Filtrado Glomerular", labels={'x': 'Tiempo', 'y': 'TFG'})
         st.plotly_chart(fig, use_container_width=True)
 
-        # Guía visual de estadios renales para interpretación médica
-        # 
-
-[Image of chronic kidney disease stages chart]
-
-
         st.success("✅ Análisis Completado")
         col_pdf, col_rec = st.columns([1, 2])
         
@@ -183,7 +177,6 @@ elif menu == "Panel Admin":
         st.error("Acceso denegado.")
     else:
         st.header("🛡️ Panel de Auditoría")
-        # 
         tab1, tab2 = st.tabs(["Logs", "Usuarios"])
         with tab1:
             logs = pd.read_sql("SELECT * FROM audit_logs ORDER BY id DESC", db.conn)
