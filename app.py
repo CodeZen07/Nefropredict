@@ -20,6 +20,8 @@ class AppDatabase:
 
     def init_db(self):
         c = self.conn.cursor()
+        
+        # Crear tabla de usuarios
         c.execute("""CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY, 
             password TEXT, 
@@ -29,6 +31,24 @@ class AppDatabase:
             active INTEGER DEFAULT 1,
             created_date TEXT)""")
         
+        # Migración: Agregar columnas si no existen
+        try:
+            c.execute("SELECT active FROM users LIMIT 1")
+        except sqlite3.OperationalError:
+            # La columna 'active' no existe, agregarla
+            c.execute("ALTER TABLE users ADD COLUMN active INTEGER DEFAULT 1")
+            print("Columna 'active' agregada a la tabla users")
+        
+        try:
+            c.execute("SELECT created_date FROM users LIMIT 1")
+        except sqlite3.OperationalError:
+            # La columna 'created_date' no existe, agregarla
+            c.execute("ALTER TABLE users ADD COLUMN created_date TEXT")
+            c.execute("UPDATE users SET created_date = ? WHERE created_date IS NULL", 
+                     (datetime.now().strftime("%Y-%m-%d"),))
+            print("Columna 'created_date' agregada a la tabla users")
+        
+        # Crear tabla de registros clínicos
         c.execute("""CREATE TABLE IF NOT EXISTS clinical_records (
             id INTEGER PRIMARY KEY AUTOINCREMENT, 
             px_name TEXT, 
@@ -49,6 +69,14 @@ class AppDatabase:
             exercise INT, 
             obs TEXT)""")
         
+        # Migración: Agregar columna exercise si no existe
+        try:
+            c.execute("SELECT exercise FROM clinical_records LIMIT 1")
+        except sqlite3.OperationalError:
+            c.execute("ALTER TABLE clinical_records ADD COLUMN exercise INTEGER DEFAULT 0")
+            print("Columna 'exercise' agregada a clinical_records")
+        
+        # Crear tabla de auditoría
         c.execute("""CREATE TABLE IF NOT EXISTS audit_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT, 
             timestamp TEXT, 
@@ -56,11 +84,14 @@ class AppDatabase:
             action TEXT, 
             details TEXT)""")
         
+        # Crear usuario admin si no existe
         c.execute("SELECT * FROM users WHERE username='admin'")
         if not c.fetchone():
             pw = bcrypt.hashpw("Admin2026!".encode(), bcrypt.gensalt()).decode()
             c.execute("INSERT INTO users VALUES ('admin', ?, 'Admin Master', 'admin', 'Sistemas', 1, ?)", 
                      (pw, datetime.now().strftime("%Y-%m-%d")))
+            print("Usuario admin creado")
+        
         self.conn.commit()
 
     def log_action(self, user, action, details):
