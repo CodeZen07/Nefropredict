@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-import joblib
 import sqlite3
 import bcrypt
 import streamlit as st
@@ -11,57 +10,44 @@ from fpdf import FPDF
 from io import BytesIO
 
 # =============================================
-# 1. CONFIGURACIÓN Y ESTÉTICA PROFESIONAL
+# 1. CONFIGURACIÓN DE INTERFAZ
 # =============================================
 st.set_page_config(
-    page_title="NefroPredict RD Pro v2.0",
+    page_title="NefroPredict RD Pro",
     page_icon="🏥",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# Paleta de colores médica
-C_PRIM = "#0066CC"  # Azul Médico
-C_SEC = "#00A896"   # Verde Salud
-C_CRIT = "#E63946"  # Rojo Crítico
-C_WARN = "#F77F00"  # Naranja Advertencia
+# Colores y Estilos CSS
+C_PRIM = "#0066CC"
+C_SEC = "#00A896"
+C_CRIT = "#E63946"
 
 st.markdown(f"""
 <style>
     .stApp {{ background-color: #0b0e14; color: #e0e0e0; }}
-    [data-testid="stSidebar"] {{ background-color: #151921; border-right: 1px solid #2d3748; }}
     .metric-card {{ 
-        background: #1a202c; 
-        padding: 20px; 
-        border-radius: 15px; 
-        border-left: 5px solid {C_PRIM};
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        background: #1a202c; padding: 20px; border-radius: 15px; 
+        border-left: 5px solid {C_PRIM}; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }}
     .risk-card {{ 
-        padding: 30px; 
-        border-radius: 20px; 
-        text-align: center; 
-        margin: 10px 0;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        padding: 30px; border-radius: 20px; text-align: center; 
+        margin: 10px 0; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
     }}
     .stButton>button {{ 
-        border-radius: 8px; 
-        font-weight: 600; 
-        transition: 0.3s; 
-        background: linear-gradient(135deg, {C_PRIM}, {C_SEC});
-        color: white;
-        border: none;
+        border-radius: 8px; font-weight: 600; background: linear-gradient(135deg, {C_PRIM}, {C_SEC});
+        color: white; border: none; transition: 0.3s;
     }}
-    .stButton>button:hover {{ transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,102,204,0.4); }}
+    .stButton>button:hover {{ transform: translateY(-2px); }}
 </style>
 """, unsafe_allow_html=True)
 
 # =============================================
-# 2. GESTIÓN DE DATOS (SQLite)
+# 2. BASE DE DATOS
 # =============================================
 class SystemDB:
     def __init__(self):
-        self.conn = sqlite3.connect("nefro_pro.db", check_same_thread=False)
+        self.conn = sqlite3.connect("nefro_final.db", check_same_thread=False)
         self.init_tables()
 
     def init_tables(self):
@@ -72,11 +58,10 @@ class SystemDB:
             id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, doctor TEXT, age INT, 
             sex TEXT, creat REAL, tfg REAL, risk REAL, stage TEXT, date TEXT)""")
         
-        # Crear admin por defecto si no existe
         c.execute("SELECT * FROM users WHERE username='admin'")
         if not c.fetchone():
             hash_pw = bcrypt.hashpw("Admin2026!".encode(), bcrypt.gensalt()).decode()
-            c.execute("INSERT INTO users VALUES (?,?,?,?,?)", ("admin", hash_pw, "Admin Central", "admin", 1))
+            c.execute("INSERT INTO users VALUES (?,?,?,?,?)", ("admin", hash_pw, "Administrador", "admin", 1))
         self.conn.commit()
 
     def add_user(self, user, pw, name, role):
@@ -90,238 +75,143 @@ class SystemDB:
 db = SystemDB()
 
 # =============================================
-# 3. LÓGICA CLÍNICA Y GRÁFICOS
+# 3. FUNCIONES CLÍNICAS Y PDF
 # =============================================
 def get_scientific_recom(stage, risk):
     if risk > 75:
-        return "URGENTE: Referencia inmediata a Nefrologia. Evaluar inicio de terapia de reemplazo renal. Iniciar IECA/ARA-II si no hay contraindicacion. Restriccion estricta de sodio <2g/dia y control de potasio."
-    if "G3" in stage or risk > 45:
-        return "MONITOREO INTENSIVO: Evaluar relacion Albumina/Creatinina en orina. Ajustar dosis de Metformina y evitar AINEs (Ibuprofeno/Diclofenaco). Control de Presion Arterial meta <130/80 mmHg."
-    return "PREVENCION PRIMARIA: Mantener Hemoglobina Glicosilada <7% en diabeticos. Actividad fisica regular (150 min/semana). Screening renal anual con Creatinina y TFG."
+        return "URGENTE: Referencia inmediata a Nefrologia. Evaluar inicio de terapia de reemplazo renal. Restriccion estricta de sodio <2g/dia."
+    if "G3" in stage:
+        return "MONITOREO: Evaluar relacion Albumina/Creatinina. Ajustar dosis de farmacos renales. Control de Presion Arterial meta <130/80 mmHg."
+    return "PREVENCION: Mantener Hemoglobina Glicosilada <7%. Actividad fisica regular (150 min/semana). Screening renal anual."
 
-def draw_radar(data):
-    categories = ['Creatinina', 'Glucosa', 'Presion Sist.', 'IMC', 'Edad']
-    # Normalización para que el gráfico sea legible
-    values = [
-        min(data['creat'] * 10, 100), 
-        min(data['gluc'] / 2, 100), 
-        min(data['pres'] / 2, 100), 
-        min(data['bmi'] * 2, 100), 
-        data['age']
-    ]
-    
-    fig = go.Figure()
-    fig.add_trace(go.Scatterpolar(r=values, theta=categories, fill='toself', line_color=C_SEC, name="Perfil del Paciente"))
-    fig.update_layout(
-        polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
-        showlegend=False, 
-        paper_bgcolor='rgba(0,0,0,0)', 
-        plot_bgcolor='rgba(0,0,0,0)', 
-        title="Analisis de Puntos Criticos Metabólicos",
-        font=dict(color="white")
-    )
-    return fig
-
-# =============================================
-# 4. GENERADOR DE PDF PROFESIONAL (CORREGIDO)
-# =============================================
 def generate_pdf(p_data, doctor_name):
     pdf = FPDF()
     pdf.add_page()
     
-    # Encabezado Institucional
+    # Encabezado
     pdf.set_fill_color(0, 102, 204)
     pdf.rect(0, 0, 210, 40, 'F')
-    
     pdf.set_font("Arial", 'B', 22)
     pdf.set_text_color(255, 255, 255)
     pdf.cell(0, 20, "NefroPredict RD - Reporte Clinico", 0, 1, 'C')
     
-    # Datos de Evaluación
+    # Datos
     pdf.set_text_color(0, 0, 0)
     pdf.ln(25)
     pdf.set_font("Arial", 'B', 12)
-    fecha_hoy = datetime.now().strftime('%d/%m/%Y %H:%M')
-    pdf.cell(0, 10, f"Paciente: {p_data['name'].upper()} | Fecha: {fecha_hoy}", 0, 1)
+    pdf.cell(0, 10, f"Paciente: {p_data['name'].upper()} | Fecha: {datetime.now().strftime('%d/%m/%Y')}", 0, 1)
     pdf.line(10, 55, 200, 55)
     
-    # Tabla de Resultados Clinicos
     pdf.ln(10)
-    pdf.set_font("Arial", 'B', 11)
-    pdf.set_fill_color(240, 240, 240)
-    pdf.cell(90, 10, "Parametro", 1, 0, 'C', True)
-    pdf.cell(90, 10, "Valor / Resultado", 1, 1, 'C', True)
-    
     pdf.set_font("Arial", '', 11)
-    results = [
-        ("Tasa Filtrado (TFG)", f"{p_data['tfg']} ml/min/1.73m2"),
-        ("Estadio ERC", p_data['stage']),
-        ("Riesgo Predictivo", f"{p_data['risk']}%"),
-        ("Creatinina Serica", f"{p_data['creat']} mg/dL")
-    ]
-    for param, val in results:
-        pdf.cell(90, 8, param, 1)
-        pdf.cell(90, 8, val, 1, 1)
+    pdf.cell(90, 10, f"Tasa Filtrado (TFG): {p_data['tfg']} ml/min", 1)
+    pdf.cell(90, 10, f"Estadio ERC: {p_data['stage']}", 1, 1)
+    pdf.cell(90, 10, f"Riesgo Predictivo: {p_data['risk']}%", 1)
+    pdf.cell(90, 10, f"Creatinina: {p_data['creat']} mg/dL", 1, 1)
     
-    # Seccion de Recomendaciones
     pdf.ln(10)
     pdf.set_font("Arial", 'B', 12)
-    pdf.set_text_color(0, 102, 204)
-    pdf.cell(0, 10, "Observaciones y Recomendaciones (Guias KDIGO):", 0, 1)
-    pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 10, "Recomendaciones Clinicas (KDIGO):", 0, 1)
     pdf.set_font("Arial", '', 11)
-    pdf.multi_cell(0, 7, p_data['recom'])
+    # Limpieza de caracteres para evitar errores de encoding
+    recom_txt = p_data['recom'].replace('á','a').replace('é','e').replace('í','i').replace('ó','o').replace('ú','u').replace('ñ','n')
+    pdf.multi_cell(0, 8, recom_txt)
     
-    # Pie de pagina y Firma
-    pdf.ln(35)
-    curr_y = pdf.get_y()
-    pdf.line(70, curr_y, 140, curr_y)
-    pdf.set_font("Arial", 'B', 11)
-    pdf.cell(0, 8, f"Dr(a). {doctor_name}", 0, 1, 'C')
-    pdf.set_font("Arial", 'I', 8)
-    pdf.cell(0, 5, "Firma y Sello del Profesional Autorizado", 0, 1, 'C')
+    pdf.ln(25)
+    pdf.line(70, pdf.get_y(), 140, pdf.get_y())
+    pdf.cell(0, 10, f"Dr(a). {doctor_name}", 0, 1, 'C')
     
-    # Retorno seguro de bytes (CORRECCIÓN ATTRIBUTE ERROR)
-    pdf_output = pdf.output(dest='S')
-    if isinstance(pdf_output, str):
-        return pdf_output.encode('latin-1', errors='replace')
-    return pdf_output
+    # --- SALIDA A BYTESIO (Solución al Error) ---
+    pdf_out = pdf.output(dest='S')
+    if isinstance(pdf_out, str):
+        return BytesIO(pdf_out.encode('latin-1', errors='replace'))
+    return BytesIO(pdf_out)
 
 # =============================================
-# 5. LOGICA DE NAVEGACIÓN Y LOGIN
+# 4. APLICACIÓN PRINCIPAL
 # =============================================
 if "auth" not in st.session_state:
     st.session_state.auth = False
 
 if not st.session_state.auth:
-    col1, col2, col3 = st.columns([1,2,1])
+    col1, col2, col3 = st.columns([1,1.5,1])
     with col2:
-        st.markdown("<div style='text-align: center; padding: 20px;'>", unsafe_allow_html=True)
-        st.image("https://cdn-icons-png.flaticon.com/512/2773/2773193.png", width=100)
-        st.markdown("<h1 style='color: #0066CC;'>NefroPredict RD</h1><h3>Acceso Profesional</h3>", unsafe_allow_html=True)
-        u = st.text_input("Usuario (ID)")
+        st.markdown("<h2 style='text-align: center;'>🔐 Acceso Médico</h2>", unsafe_allow_html=True)
+        u = st.text_input("Usuario")
         p = st.text_input("Contraseña", type="password")
-        if st.button("INICIAR SESIÓN", use_container_width=True):
+        if st.button("INGRESAR AL SISTEMA", use_container_width=True):
             cursor = db.conn.cursor()
             cursor.execute("SELECT password, name, role FROM users WHERE username=?", (u,))
             res = cursor.fetchone()
             if res and bcrypt.checkpw(p.encode(), res[0].encode()):
                 st.session_state.auth = True
-                st.session_state.user = u
-                st.session_state.name = res[1]
-                st.session_state.role = res[2]
+                st.session_state.user, st.session_state.name, st.session_state.role = u, res[1], res[2]
                 st.rerun()
-            else: st.error("Credenciales incorrectas o cuenta inactiva.")
+            else: st.error("Error de credenciales")
     st.stop()
 
-# Menú Lateral
+# Navegación Sidebar
 with st.sidebar:
-    st.markdown(f"### Bienvenido/a<br><span style='color:{C_SEC}'>Dr. {st.session_state.name}</span>", unsafe_allow_html=True)
-    st.markdown("---")
-    opt = st.radio("MENÚ PRINCIPAL", ["🩺 Nueva Evaluación", "📅 Historial Clínico", "👥 Gestión de Usuarios"])
-    st.markdown("---")
-    if st.button("🚪 Cerrar Sesión", use_container_width=True):
+    st.title("NefroPredict RD")
+    st.write(f"Sesión: Dr. {st.session_state.name}")
+    menu = st.radio("Menu", ["🩺 Evaluación", "📅 Historial", "👥 Usuarios"])
+    if st.button("Cerrar Sesión"):
         st.session_state.auth = False
         st.rerun()
 
-# =============================================
-# 6. MÓDULOS DE LA APLICACIÓN
-# =============================================
-if opt == "🩺 Nueva Evaluación":
-    st.header("🔬 Evaluación de Riesgo Nefrológico")
+if menu == "🩺 Evaluación":
+    st.header("Nueva Evaluación Clínica")
     c1, c2 = st.columns([1, 1.2])
     
     with c1:
-        st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
-        with st.form("eval_form"):
-            px_name = st.text_input("Nombre Completo del Paciente", placeholder="Ej. Juan Pérez")
-            c_a, c_b = st.columns(2)
-            age = c_a.number_input("Edad", 18, 110, 50)
-            sex = c_b.selectbox("Sexo Biológico", ["Hombre", "Mujer"])
-            
-            creat = st.number_input("Creatinina Sérica (mg/dL)", 0.2, 15.0, 1.1, help="Valor clave para el filtrado glomerular.")
-            gluc = st.number_input("Glucosa en Ayunas (mg/dL)", 50, 500, 100)
-            pres = st.number_input("Presión Sistólica (mmHg)", 80, 250, 125)
-            bmi = st.number_input("IMC (Indice Masa Corporal)", 10.0, 50.0, 26.0)
-            
-            btn = st.form_submit_button("EJECUTAR ANÁLISIS")
-        st.markdown("</div>", unsafe_allow_html=True)
+        with st.form("form_eval"):
+            px = st.text_input("Nombre del Paciente")
+            edad = st.number_input("Edad", 18, 100, 55)
+            sexo = st.selectbox("Sexo", ["Hombre", "Mujer"])
+            creat = st.number_input("Creatinina (mg/dL)", 0.3, 12.0, 1.2)
+            gluc = st.number_input("Glucosa (mg/dL)", 60, 400, 110)
+            pres = st.number_input("Presión Sistólica", 80, 200, 135)
+            imc = st.number_input("IMC", 15.0, 45.0, 27.0)
+            submit = st.form_submit_button("ANALIZAR RIESGO")
 
-    if btn:
-        # Fórmulas de Cálculo Clínico
-        k = 0.7 if sex == "Mujer" else 0.9
-        a = -0.329 if sex == "Mujer" else -0.411
-        tfg = 141 * min(creat/k, 1)**a * max(creat/k, 1)**-1.209 * 0.993**age
-        if sex == "Mujer": tfg *= 1.018
-        
-        tfg = round(tfg, 1)
-        risk = round(min(99.5, (creat*18) + (age*0.15) + (gluc*0.08) + (pres*0.05)), 1)
-        stage = "G1 (Normal)" if tfg >= 90 else "G2 (Leve)" if tfg >= 60 else "G3a (Moderado)" if tfg >= 45 else "G3b (Severo)" if tfg >= 30 else "G4 (Crítico)" if tfg >= 15 else "G5 (Falla)"
+    if submit:
+        # Cálculo TFG (CKD-EPI simplificado)
+        k = 0.7 if sexo == "Mujer" else 0.9
+        a = -0.329 if sexo == "Mujer" else -0.411
+        tfg = round(141 * min(creat/k, 1)**a * max(creat/k, 1)**-1.209 * 0.993**edad * (1.018 if sexo == "Mujer" else 1), 1)
+        risk = round(min(98, (creat*20) + (edad*0.1) + (gluc*0.05)), 1)
+        stage = "G1" if tfg >= 90 else "G2" if tfg >= 60 else "G3" if tfg >= 30 else "G4" if tfg >= 15 else "G5"
         recom = get_scientific_recom(stage, risk)
         
-        # Guardar en DB
         db.conn.execute("INSERT INTO patients (name, doctor, age, sex, creat, tfg, risk, stage, date) VALUES (?,?,?,?,?,?,?,?,?)",
-                       (px_name, st.session_state.name, age, sex, creat, tfg, risk, stage, datetime.now().strftime('%Y-%m-%d %H:%M')))
+                       (px, st.session_state.name, edad, sexo, creat, tfg, risk, stage, datetime.now().strftime('%Y-%m-%d')))
         db.conn.commit()
 
         with c2:
-            st.plotly_chart(draw_radar(locals()), use_container_width=True)
+            # Gráfico de Radar
+            fig = go.Figure(go.Scatterpolar(r=[creat*10, gluc/2, pres/2, imc, edad], theta=['Creat','Gluc','Pres','IMC','Edad'], fill='toself'))
+            fig.update_layout(polar=dict(radialaxis=dict(visible=False)), showlegend=False, title="Factores Críticos")
+            st.plotly_chart(fig, use_container_width=True)
             
-            color = C_CRIT if risk > 70 else C_WARN if risk > 40 else C_SEC
-            st.markdown(f"""
-                <div class='risk-card' style='border: 2px solid {color}; background: {color}11;'>
-                    <h2 style='color: white;'>Riesgo de Progresión ERC</h2>
-                    <h1 style='color: {color}; font-size: 4rem;'>{risk}%</h1>
-                    <p style='font-size: 1.2rem;'>Estadio Detectado: <b>{stage}</b></p>
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown(f"<div class='risk-card' style='background:{C_CRIT if risk > 60 else C_SEC}22;'><h2>Riesgo: {risk}%</h2><p>Estadio {stage}</p></div>", unsafe_allow_html=True)
             
-            # Preparar PDF
-            p_data = {'name': px_name, 'tfg': tfg, 'stage': stage, 'risk': risk, 'creat': creat, 'recom': recom}
-            pdf_bytes = generate_pdf(p_data, st.session_state.name)
-            st.download_button(
-                label="📄 DESCARGAR REPORTE PARA PACIENTE",
-                data=pdf_bytes,
-                file_name=f"Reporte_Nefrologia_{px_name.replace(' ','_')}.pdf",
-                mime="application/pdf",
-                use_container_width=True
-            )
+            # Botón de Descarga Seguro
+            p_data = {'name': px, 'tfg': tfg, 'stage': stage, 'risk': risk, 'creat': creat, 'recom': recom}
+            pdf_buf = generate_pdf(p_data, st.session_state.name)
+            st.download_button("📥 Descargar Reporte PDF", data=pdf_buf.getvalue(), file_name=f"Reporte_{px}.pdf", mime="application/pdf")
 
-elif opt == "📅 Historial Clínico":
-    st.header("Historico General de Consultas")
-    df = pd.read_sql("SELECT id, name as Paciente, age as Edad, tfg as TFG, stage as Estadio, risk as Riesgo, date as Fecha FROM patients ORDER BY id DESC", db.conn)
-    
-    # Filtros rápidos
-    c1, c2 = st.columns(2)
-    search = c1.text_input("🔍 Buscar por nombre de paciente")
-    if search:
-        df = df[df['Paciente'].str.contains(search, case=False)]
-    
-    st.dataframe(df, use_container_width=True, hide_index=True)
-    
-    if not df.empty:
-        fig_trend = px.line(df, x="Fecha", y="Riesgo", title="Tendencia de Riesgo en Consultas", markers=True)
-        st.plotly_chart(fig_trend, use_container_width=True)
+elif menu == "📅 Historial":
+    st.header("Registro de Pacientes")
+    df = pd.read_sql("SELECT * FROM patients ORDER BY id DESC", db.conn)
+    st.dataframe(df, use_container_width=True)
 
-elif opt == "👥 Gestión de Usuarios":
+elif menu == "👥 Usuarios":
     if st.session_state.role != "admin":
-        st.warning("🔒 Esta sección es exclusiva para el Administrador del Sistema.")
+        st.warning("Solo administradores")
     else:
-        st.header("Administración de Personal Médico")
-        
-        with st.expander("➕ Registrar Nuevo Médico / Usuario"):
-            with st.form("new_user"):
-                new_u = st.text_input("Usuario (ID para login)")
-                new_p = st.text_input("Contraseña Temporal", type="password")
-                new_n = st.text_input("Nombre y Apellidos del Doctor")
-                new_r = st.selectbox("Rol de Sistema", ["doctor", "admin"])
-                if st.form_submit_button("CREAR CUENTA"):
-                    if new_u and new_p and new_n:
-                        if db.add_user(new_u, new_p, new_n, new_r):
-                            st.success(f"Médico {new_n} registrado exitosamente.")
-                        else: st.error("El nombre de usuario ya existe.")
-                    else: st.error("Todos los campos son obligatorios.")
-        
-        st.subheader("Personal con Acceso al Sistema")
-        users_df = pd.read_sql("SELECT username as ID, name as Nombre, role as Rol, active as Activo FROM users", db.conn)
-        st.table(users_df)
+        st.subheader("Registrar Nuevo Doctor")
+        with st.form("add_doc"):
+            nu, np, nn = st.text_input("ID Usuario"), st.text_input("Password", type="password"), st.text_input("Nombre")
+            if st.form_submit_button("Crear"):
+                if db.add_user(nu, np, nn, "doctor"): st.success("Doctor creado")
+                else: st.error("Error al crear")
