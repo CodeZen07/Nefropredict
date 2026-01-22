@@ -597,4 +597,525 @@ if menu == "🔬 Nueva Consulta":
                 st.error("**Clasificación KDIGO:** G5 - Falla Renal")
         
         with col_g2:
-            #
+            # Gauge de FEVI con colores oscuros
+            fig_fevi = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=d['fevi'],
+                title={'text': "Función Cardíaca (FEVI)<br><span style='font-size:0.8em'>Fracción de Eyección %</span>", 'font': {'size': 20, 'color': '#f8fafc'}},
+                gauge={
+                    'axis': {'range': [0, 80], 'tickcolor': '#94a3b8'},
+                    'bar': {'color': "#ef4444"},
+                    'bgcolor': '#1e293b',
+                    'steps': [
+                        {'range': [0, 40], 'color': "rgba(239, 68, 68, 0.3)"},
+                        {'range': [40, 50], 'color': "rgba(251, 146, 60, 0.3)"},
+                        {'range': [50, 80], 'color': "rgba(16, 185, 129, 0.3)"}
+                    ],
+                    'threshold': {
+                        'line': {'color': "#fb923c", 'width': 4},
+                        'thickness': 0.75,
+                        'value': 50
+                    }
+                }
+            ))
+            fig_fevi.update_layout(
+                height=350, 
+                margin=dict(l=20, r=20, t=80, b=20),
+                paper_bgcolor='#0f172a',
+                plot_bgcolor='#1e293b',
+                font={'color': '#f8fafc'}
+            )
+            st.plotly_chart(fig_fevi, use_container_width=True)
+            
+            # Clasificación IC
+            if d['fevi'] >= 50:
+                st.success("**Estado Cardíaco:** Normal")
+            elif d['fevi'] >= 40:
+                st.warning("**Estado Cardíaco:** FE Limítrofe")
+            else:
+                st.error("**Estado Cardíaco:** IC con FE Reducida")
+        
+        # Gráfico de tendencia proyectada
+        st.subheader("📈 Proyección de Evolución (Con Adherencia al Tratamiento)")
+        fechas = ["Hoy", "+2 meses", "+4 meses", "+6 meses", "+12 meses"]
+        
+        # Proyección optimista con tratamiento
+        if d['tfg'] < 60:
+            progreso_tfg = [d['tfg'], d['tfg']*1.02, d['tfg']*1.04, d['tfg']*1.06, d['tfg']*1.08]
+        else:
+            progreso_tfg = [d['tfg'], d['tfg']*1.01, d['tfg']*1.015, d['tfg']*1.02, d['tfg']*1.02]
+        
+        if d['fevi'] < 50:
+            progreso_fevi = [d['fevi'], d['fevi']*1.03, d['fevi']*1.06, d['fevi']*1.08, d['fevi']*1.10]
+        else:
+            progreso_fevi = [d['fevi'], d['fevi']*1.01, d['fevi']*1.01, d['fevi']*1.015, d['fevi']*1.015]
+        
+        fig_trend = go.Figure()
+        fig_trend.add_trace(go.Scatter(
+            x=fechas, y=progreso_tfg, 
+            mode='lines+markers', 
+            name="TFG Proyectada",
+            line=dict(color='#3b82f6', width=3),
+            marker=dict(size=10)
+        ))
+        fig_trend.add_trace(go.Scatter(
+            x=fechas, y=progreso_fevi, 
+            mode='lines+markers', 
+            name="FEVI Proyectada",
+            line=dict(color='#ef4444', width=3, dash='dash'),
+            marker=dict(size=10, symbol='diamond')
+        ))
+        
+        fig_trend.update_layout(
+            title="Evolución Esperada con Manejo Óptimo",
+            xaxis_title="Tiempo",
+            yaxis_title="Valor",
+            hovermode='x unified',
+            height=400,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            paper_bgcolor='#0f172a',
+            plot_bgcolor='#1e293b',
+            font={'color': '#f8fafc'},
+            xaxis={'gridcolor': '#334155'},
+            yaxis={'gridcolor': '#334155'}
+        )
+        st.plotly_chart(fig_trend, use_container_width=True)
+        
+        # Gráfico de parámetros múltiples
+        st.subheader("🎯 Panel de Parámetros Clínicos")
+        col_p1, col_p2 = st.columns(2)
+        
+        with col_p1:
+            # Gráfico de barras comparativo
+            parametros = ['Presión\nSistólica', 'Potasio\n(K+)', 'Horas\nSueño']
+            valores = [d['sys'], d['potasio']*25, d['sleep']*15]
+            valores_objetivo = [120, 4.5*25, 7.5*15]
+            
+            fig_params = go.Figure(data=[
+                go.Bar(name='Valor Actual', x=parametros, y=valores, marker_color='#fb923c'),
+                go.Bar(name='Valor Objetivo', x=parametros, y=valores_objetivo, marker_color='#10b981')
+            ])
+            fig_params.update_layout(
+                title="Comparación con Valores Objetivo",
+                barmode='group',
+                height=350,
+                yaxis_title="Valor (escala normalizada)",
+                paper_bgcolor='#0f172a',
+                plot_bgcolor='#1e293b',
+                font={'color': '#f8fafc'},
+                xaxis={'gridcolor': '#334155'},
+                yaxis={'gridcolor': '#334155'}
+            )
+            st.plotly_chart(fig_params, use_container_width=True)
+        
+        with col_p2:
+            # Gráfico de radar para estilo de vida
+            categories = ['Sueño\n(h/día)', 'Ejercicio\n(min/sem)', 'Control\nEstrés']
+            
+            valores_actuales = [
+                (d['sleep'] / 8) * 100,
+                (d.get('exercise', 0) / 150) * 100,
+                {'Alto': 30, 'Moderado': 60, 'Bajo': 90}.get(d['stress'], 60)
+            ]
+            
+            fig_radar = go.Figure()
+            fig_radar.add_trace(go.Scatterpolar(
+                r=valores_actuales,
+                theta=categories,
+                fill='toself',
+                name='Actual',
+                line_color='#fb923c'
+            ))
+            fig_radar.add_trace(go.Scatterpolar(
+                r=[100, 100, 100],
+                theta=categories,
+                fill='toself',
+                name='Objetivo',
+                line_color='#10b981',
+                opacity=0.5
+            ))
+            fig_radar.update_layout(
+                polar=dict(
+                    radialaxis=dict(visible=True, range=[0, 100], gridcolor='#334155'),
+                    bgcolor='#1e293b'
+                ),
+                title="Evaluación de Estilo de Vida",
+                height=350,
+                paper_bgcolor='#0f172a',
+                font={'color': '#f8fafc'}
+            )
+            st.plotly_chart(fig_radar, use_container_width=True)
+        
+        # Recomendaciones científicas
+        st.divider()
+        st.header("💊 Plan de Tratamiento y Recomendaciones")
+        
+        tab1, tab2, tab3, tab4 = st.tabs(["🏥 Manejo Clínico", "🥗 Nutrición", "🏃 Estilo de Vida", "📅 Seguimiento"])
+        
+        with tab1:
+            if r['clinico']:
+                for rec in r['clinico']:
+                    st.success(rec)
+            else:
+                st.info("No se detectaron necesidades clínicas urgentes")
+        
+        with tab2:
+            if r['dieta']:
+                for rec in r['dieta']:
+                    st.warning(rec) if 'URGENTE' in rec or '🔴' in rec else st.info(rec)
+            else:
+                st.info("Mantener dieta balanceada según recomendaciones generales")
+        
+        with tab3:
+            if r['estilo']:
+                for rec in r['estilo']:
+                    st.info(rec)
+            else:
+                st.success("Estilo de vida dentro de parámetros saludables")
+        
+        with tab4:
+            if r['seguimiento']:
+                for rec in r['seguimiento']:
+                    st.info(rec)
+            else:
+                st.info("Control anual de rutina recomendado")
+        
+        # Generar PDF
+        st.divider()
+        col_pdf, col_info = st.columns([1, 2])
+        
+        with col_pdf:
+            st.subheader("📄 Generar Reporte")
+            pdf_data = crear_pdf(d, r, alertas, st.session_state.name)
+            st.download_button(
+                label="⬇️ Descargar PDF Completo",
+                data=pdf_data,
+                file_name=f"Reporte_Cardiorrenal_{d['px_id']}_{datetime.now().strftime('%Y%m%d')}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                type="primary"
+            )
+            st.caption(f"Generado por: Dr. {st.session_state.name}")
+        
+        with col_info:
+            st.warning("""
+            ### ⚕️ IMPORTANTE - Uso Responsable del Sistema
+            
+            Este sistema es una **herramienta de apoyo clínico** basada en:
+            - Guías KDIGO 2024 (Enfermedad Renal Crónica)
+            - Guías AHA/ACC 2023 (Insuficiencia Cardíaca)
+            
+            **NO sustituye:**
+            - La evaluación médica presencial
+            - El juicio clínico individualizado
+            - La valoración integral del contexto del paciente
+            
+            Todas las decisiones terapéuticas deben ser validadas por el médico tratante.
+            """)
+
+# =============================================
+# SECCIÓN: HISTORIAL DE PACIENTES
+# =============================================
+elif menu == "📂 Historial":
+    st.title("📂 Historial Clínico de Pacientes")
+    
+    col_search, col_filter = st.columns([2, 1])
+    with col_search:
+        h_px = st.text_input("🔍 Buscar por nombre de paciente", placeholder="Ej: Juan Pérez")
+    with col_filter:
+        fecha_desde = st.date_input("Desde", datetime.now().replace(day=1))
+    
+    if h_px or st.button("Ver todos los registros"):
+        query = "SELECT * FROM clinical_records WHERE 1=1"
+        params = []
+        
+        if h_px:
+            query += " AND px_name LIKE ?"
+            params.append(f"%{h_px}%")
+        
+        query += " ORDER BY date DESC"
+        
+        df_h = pd.read_sql(query, db.conn, params=params if params else None)
+        
+        if not df_h.empty:
+            st.success(f"✅ Se encontraron {len(df_h)} registros")
+            
+            # Mostrar tabla
+            st.dataframe(
+                df_h[['id', 'px_name', 'px_id', 'date', 'doctor', 'tfg', 'fevi', 'potasio', 'sys']],
+                use_container_width=True,
+                column_config={
+                    "id": "ID",
+                    "px_name": "Paciente",
+                    "px_id": "Cédula",
+                    "date": "Fecha",
+                    "doctor": "Médico",
+                    "tfg": st.column_config.NumberColumn("TFG", format="%.1f"),
+                    "fevi": st.column_config.NumberColumn("FEVI %", format="%.0f"),
+                    "potasio": st.column_config.NumberColumn("K+", format="%.2f"),
+                    "sys": st.column_config.NumberColumn("PA Sistólica", format="%.0f")
+                }
+            )
+            
+            # Gráfico de evolución histórica
+            if len(df_h) > 1:
+                st.subheader("📈 Evolución Temporal")
+                
+                fig_hist = go.Figure()
+                fig_hist.add_trace(go.Scatter(
+                    x=df_h['date'], y=df_h['tfg'],
+                    mode='lines+markers',
+                    name='TFG',
+                    line=dict(color='#3b82f6', width=2),
+                    marker=dict(size=8)
+                ))
+                fig_hist.add_trace(go.Scatter(
+                    x=df_h['date'], y=df_h['fevi'],
+                    mode='lines+markers',
+                    name='FEVI',
+                    line=dict(color='#ef4444', width=2),
+                    marker=dict(size=8),
+                    yaxis='y2'
+                ))
+                
+                fig_hist.update_layout(
+                    title=f"Evolución Clínica - {df_h.iloc[0]['px_name']}",
+                    xaxis_title="Fecha",
+                    yaxis=dict(title="TFG (ml/min)", side='left'),
+                    yaxis2=dict(title="FEVI (%)", overlaying='y', side='right'),
+                    hovermode='x unified',
+                    height=400,
+                    paper_bgcolor='#0f172a',
+                    plot_bgcolor='#1e293b',
+                    font={'color': '#f8fafc'},
+                    xaxis={'gridcolor': '#334155'},
+                    yaxis={'gridcolor': '#334155'}
+                )
+                st.plotly_chart(fig_hist, use_container_width=True)
+                
+                # Análisis de tendencia
+                tendencia_tfg = df_h['tfg'].iloc[0] - df_h['tfg'].iloc[-1]
+                tendencia_fevi = df_h['fevi'].iloc[0] - df_h['fevi'].iloc[-1]
+                
+                col_t1, col_t2 = st.columns(2)
+                with col_t1:
+                    if tendencia_tfg > 0:
+                        st.success(f"📈 TFG: Mejora de {tendencia_tfg:.1f} ml/min")
+                    elif tendencia_tfg < 0:
+                        st.error(f"📉 TFG: Descenso de {abs(tendencia_tfg):.1f} ml/min")
+                    else:
+                        st.info("➡️ TFG: Estable")
+                
+                with col_t2:
+                    if tendencia_fevi > 0:
+                        st.success(f"📈 FEVI: Mejora de {tendencia_fevi:.1f}%")
+                    elif tendencia_fevi < 0:
+                        st.error(f"📉 FEVI: Descenso de {abs(tendencia_fevi):.1f}%")
+                    else:
+                        st.info("➡️ FEVI: Estable")
+        else:
+            st.warning("No se encontraron registros con los criterios de búsqueda")
+
+# =============================================
+# SECCIÓN: PANEL DE ADMINISTRACIÓN
+# =============================================
+elif menu == "⚙️ Panel Admin":
+    if st.session_state.role != 'admin':
+        st.error("⛔ Acceso denegado. Se requieren privilegios de administrador.")
+        st.stop()
+    
+    st.title("⚙️ Panel de Administración")
+    
+    tab1, tab2 = st.tabs(["👥 Gestión de Usuarios", "📊 Auditoría del Sistema"])
+    
+    # TAB 1: Gestión de Usuarios
+    with tab1:
+        st.header("👥 Administración de Usuarios")
+        
+        # Listar usuarios existentes
+        df_users = pd.read_sql("SELECT username, name, role, specialty, active, created_date FROM users", db.conn)
+        
+        col_u1, col_u2 = st.columns([2, 1])
+        with col_u1:
+            st.subheader("Usuarios Registrados")
+            st.dataframe(
+                df_users,
+                use_container_width=True,
+                column_config={
+                    "username": "Usuario",
+                    "name": "Nombre",
+                    "role": "Rol",
+                    "specialty": "Especialidad",
+                    "active": st.column_config.CheckboxColumn("Activo"),
+                    "created_date": "Fecha Creación"
+                }
+            )
+        
+        with col_u2:
+            st.metric("Total Usuarios", len(df_users))
+            st.metric("Usuarios Activos", df_users['active'].sum())
+            st.metric("Administradores", len(df_users[df_users['role'] == 'admin']))
+        
+        st.divider()
+        
+        # Crear nuevo usuario
+        col_crear, col_gestionar = st.columns(2)
+        
+        with col_crear:
+            st.subheader("➕ Crear Nuevo Usuario")
+            with st.form("add_user_form"):
+                new_u = st.text_input("Usuario *", placeholder="jperez")
+                new_n = st.text_input("Nombre Completo *", placeholder="Dr. Juan Pérez")
+                new_p = st.text_input("Contraseña *", type="password", placeholder="Mínimo 8 caracteres")
+                new_spec = st.text_input("Especialidad", placeholder="Cardiología")
+                new_r = st.selectbox("Rol *", ["medico", "admin"])
+                
+                if st.form_submit_button("✅ Crear Usuario", use_container_width=True, type="primary"):
+                    if new_u and new_n and new_p:
+                        try:
+                            hash_p = bcrypt.hashpw(new_p.encode(), bcrypt.gensalt()).decode()
+                            db.conn.execute(
+                                "INSERT INTO users (username, password, name, role, specialty, active, created_date) VALUES (?,?,?,?,?,1,?)",
+                                (new_u, hash_p, new_n, new_r, new_spec, datetime.now().strftime("%Y-%m-%d"))
+                            )
+                            db.conn.commit()
+                            db.log_action(st.session_state.username, "Usuario Creado", f"Nuevo usuario: {new_u} ({new_r})")
+                            st.success(f"✅ Usuario '{new_u}' creado exitosamente")
+                            st.rerun()
+                        except sqlite3.IntegrityError:
+                            st.error("❌ El usuario ya existe")
+                    else:
+                        st.error("⚠️ Complete todos los campos obligatorios")
+        
+        with col_gestionar:
+            st.subheader("🔧 Gestionar Usuario Existente")
+            user_select = st.selectbox("Seleccionar usuario", df_users['username'].tolist())
+            
+            if user_select:
+                user_data = df_users[df_users['username'] == user_select].iloc[0]
+                
+                col_act1, col_act2 = st.columns(2)
+                
+                with col_act1:
+                    if user_data['active'] == 1:
+                        if st.button("🔴 Desactivar Usuario", use_container_width=True):
+                            db.conn.execute("UPDATE users SET active=0 WHERE username=?", (user_select,))
+                            db.conn.commit()
+                            db.log_action(st.session_state.username, "Usuario Desactivado", f"Usuario: {user_select}")
+                            st.success(f"Usuario '{user_select}' desactivado")
+                            st.rerun()
+                    else:
+                        if st.button("🟢 Activar Usuario", use_container_width=True):
+                            db.conn.execute("UPDATE users SET active=1 WHERE username=?", (user_select,))
+                            db.conn.commit()
+                            db.log_action(st.session_state.username, "Usuario Activado", f"Usuario: {user_select}")
+                            st.success(f"Usuario '{user_select}' activado")
+                            st.rerun()
+                
+                with col_act2:
+                    if st.button("🗑️ Eliminar Permanentemente", use_container_width=True, type="secondary"):
+                        if user_select != 'admin':
+                            db.conn.execute("DELETE FROM users WHERE username=?", (user_select,))
+                            db.conn.commit()
+                            db.log_action(st.session_state.username, "Usuario Eliminado", f"Usuario: {user_select}")
+                            st.warning(f"Usuario '{user_select}' eliminado")
+                            st.rerun()
+                        else:
+                            st.error("⛔ No se puede eliminar el usuario admin")
+                
+                st.info(f"""
+                **Información del Usuario:**
+                - **Nombre:** {user_data['name']}
+                - **Rol:** {user_data['role']}
+                - **Especialidad:** {user_data['specialty'] or 'N/A'}
+                - **Estado:** {'Activo' if user_data['active'] == 1 else 'Inactivo'}
+                - **Creado:** {user_data['created_date']}
+                """)
+    
+    # TAB 2: Auditoría
+    with tab2:
+        st.header("📊 Registro de Auditoría del Sistema")
+        
+        col_f1, col_f2, col_f3 = st.columns(3)
+        with col_f1:
+            filtro_user = st.selectbox("Filtrar por usuario", ["Todos"] + df_users['username'].tolist())
+        with col_f2:
+            filtro_accion = st.selectbox("Filtrar por acción", 
+                ["Todas", "Login", "Logout", "Consulta Creada", "Usuario Creado", "Usuario Desactivado", "Usuario Eliminado"])
+        with col_f3:
+            limite_registros = st.number_input("Mostrar últimos N registros", 10, 1000, 100, step=10)
+        
+        # Construir query de auditoría
+        query_audit = "SELECT * FROM audit_logs WHERE 1=1"
+        params_audit = []
+        
+        if filtro_user != "Todos":
+            query_audit += " AND user = ?"
+            params_audit.append(filtro_user)
+        
+        if filtro_accion != "Todas":
+            query_audit += " AND action = ?"
+            params_audit.append(filtro_accion)
+        
+        query_audit += f" ORDER BY id DESC LIMIT {limite_registros}"
+        
+        df_logs = pd.read_sql(query_audit, db.conn, params=params_audit if params_audit else None)
+        
+        if not df_logs.empty:
+            st.dataframe(
+                df_logs,
+                use_container_width=True,
+                column_config={
+                    "id": "ID",
+                    "timestamp": "Fecha/Hora",
+                    "user": "Usuario",
+                    "action": "Acción",
+                    "details": "Detalles"
+                }
+            )
+            
+            # Estadísticas de auditoría
+            st.divider()
+            st.subheader("📈 Estadísticas de Actividad")
+            
+            col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+            col_s1.metric("Total Eventos", len(df_logs))
+            col_s2.metric("Logins", len(df_logs[df_logs['action'] == 'Login']))
+            col_s3.metric("Consultas", len(df_logs[df_logs['action'] == 'Consulta Creada']))
+            col_s4.metric("Usuarios Únicos", df_logs['user'].nunique())
+            
+            # Gráfico de actividad por acción
+            fig_audit = px.pie(
+                df_logs, 
+                names='action', 
+                title='Distribución de Acciones en el Sistema',
+                hole=0.4,
+                color_discrete_sequence=['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+            )
+            fig_audit.update_layout(
+                paper_bgcolor='#0f172a',
+                plot_bgcolor='#1e293b',
+                font={'color': '#f8fafc'}
+            )
+            st.plotly_chart(fig_audit, use_container_width=True)
+            
+            # Exportar auditoría
+            csv = df_logs.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Exportar Auditoría (CSV)",
+                data=csv,
+                file_name=f"auditoria_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+        else:
+            st.info("No hay registros de auditoría con los filtros seleccionados")
+
+# Footer
+st.markdown("---")
+st.markdown("""
+<div style='text-align: center; color: #94a3b8; font-size: 0.9em;'>
+    <p><strong style='color: #3b82f6;'>NefroCardio Pro SaaS v2.0</strong> | Sistema de Evaluación Cardiorrenal</p>
+    <p>⚕️ Basado en guías KDIGO 2024 y AHA/ACC 2023</p>
+    <p>⚠️ <em>Herramienta de apoyo clínico - No sustituye la evaluación médica profesional</em></p>
+</div>
+""", unsafe_allow_html=True)
